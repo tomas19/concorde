@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+from sklearn.cluster import KMeans
+from scipy.spatial import ConvexHull, Voronoi, voronoi_plot_2d
 
 def fnorm(vec, maxi = 1, mini = 0):
     ''' function to normalize a vector regarding the maximum value.
