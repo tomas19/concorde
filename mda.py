@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
-from scipy.spatial import ConvexHull, Voronoi, voronoi_plot_2d
+from scipy.spatial import ConvexHull, Voronoi, voronoi_plot_2d, cKDTree
+from tqdm import tqdm
 
 def fnorm(vec, maxi = 1, mini = 0):
     ''' function to normalize a vector regarding the maximum value.
@@ -41,7 +42,7 @@ def fnorm_inv(vec, norm, maxi = 1, mini = 0):
     vec2 = (norm-mini)*(np.max(vec)-np.min(vec))/(maxi-mini)+np.min(vec)
     return vec2
   
-  def ecdist_mda(vec0, vec1, index):
+def ecdist_mda(vec0, vec1, index):
     ''' Computes euclidean distance between two normalized tuples regarding Camus et al. 2011 formulation (MDA methodology)
   
         Parameters
@@ -168,7 +169,7 @@ def anti_neighbors(df, k, index, maxi = 1, mini = 0, dirnorm = 180, nkmeans = 0,
     solution_set = []
     index_solution_set = []
     
-    tree = spatial.cKDTree(norm.values)
+    tree = cKDTree(norm.values)
     meanvalue = list(norm.mean())
     ix_meanvalue = tree.query(meanvalue)[1]
     
@@ -199,7 +200,7 @@ def anti_neighbors(df, k, index, maxi = 1, mini = 0, dirnorm = 180, nkmeans = 0,
         clusters = clusters.append(dfkmeans)
         
     if voronoi_weight == True:
-        voronoi_kdtree = spatial.cKDTree(clusters.iloc[:, :-1].values)
+        voronoi_kdtree = cKDTree(clusters.iloc[:, :-1].values)
         points_dist, points_regions = voronoi_kdtree.query(df.values)
         region_percentage = []
 
