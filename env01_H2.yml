@@ -1,0 +1,11 @@
+name: concorde_env01
+channels:
+  - defaults
+dependencies:
+  - pip
+  - pip:
+    - numpy
+    - tqdm
+    - pandas
+    - scikit-learn
+    - scipy

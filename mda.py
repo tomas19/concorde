@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
-from scipy.spatial import ConvexHull, Voronoi, voronoi_plot_2d
+from scipy.spatial import ConvexHull, Voronoi, voronoi_plot_2d, cKDTree
+from tqdm import tqdm
+import dask.array as da
+import dask_distance as ddist
+from scipy.spatial.distance import cdist
 
 def fnorm(vec, maxi = 1, mini = 0):
     ''' function to normalize a vector regarding the maximum value.
@@ -41,7 +45,7 @@ def fnorm_inv(vec, norm, maxi = 1, mini = 0):
     vec2 = (norm-mini)*(np.max(vec)-np.min(vec))/(maxi-mini)+np.min(vec)
     return vec2
   
-  def ecdist_mda(vec0, vec1, index):
+def ecdist_mda(vec0, vec1, index):
     ''' Computes euclidean distance between two normalized tuples regarding Camus et al. 2011 formulation (MDA methodology)
   
         Parameters
@@ -137,7 +141,7 @@ def unnormalize_df(df, clusters_norm, index, maxi = 1, mini = 0, dirnorm = 180):
     return clusters_unnorm
 
 def anti_neighbors(df, k, index, maxi = 1, mini = 0, dirnorm = 180, nkmeans = 0, voronoi_weight = True):
-    '''Search the k farthest neighbors. This fx calls "ecdist_mda", "normalize_df" and "unnormalize_df" as auxiliary functions
+    ''' Search the k farthest neighbors. This fx calls "ecdist_mda", "normalize_df" and "unnormalize_df" as auxiliary functions
   
         Parameters
             df: dataframe
@@ -168,15 +172,15 @@ def anti_neighbors(df, k, index, maxi = 1, mini = 0, dirnorm = 180, nkmeans = 0,
     solution_set = []
     index_solution_set = []
     
-    tree = spatial.cKDTree(norm.values)
-    meanvalue = list(norm.mean())
-    ix_meanvalue = tree.query(meanvalue)[1]
+    tree = cKDTree(norm.values)
+    start = list(norm.mean())
     
-    solution_set.append(remaining_points.pop(ix_meanvalue))
-    index_solution_set.append(dummy_index.pop(ix_meanvalue))
+    ix_start = tree.query(start)[1]
+    solution_set.append(remaining_points.pop(ix_start))
+    index_solution_set.append(dummy_index.pop(ix_start))
     
-    for _ in tqdm(range(k-1)):
-        distances = [ecdist_mda(p, solution_set[0], index) for p in remaining_points]
+    distances = [ecdist_mda(p, solution_set[0], index) for p in remaining_points]
+    for _ in range(k-1):
         for i, p in enumerate(remaining_points):
             for j, s in enumerate(solution_set):
                 distances[i] = min(distances[i], ecdist_mda(p, s, index))
@@ -184,6 +188,7 @@ def anti_neighbors(df, k, index, maxi = 1, mini = 0, dirnorm = 180, nkmeans = 0,
         dummy = distances.index(max(distances))
         index_solution_set.append(dummy_index.pop(dummy))
         solution_set.append(remaining_points.pop(dummy))
+        distances.pop(dummy)
         
     normclusters = pd.DataFrame(columns = df.columns, data = solution_set)
     clusters = unnormalize_df(df, normclusters, index)
@@ -199,7 +204,198 @@ def anti_neighbors(df, k, index, maxi = 1, mini = 0, dirnorm = 180, nkmeans = 0,
         clusters = clusters.append(dfkmeans)
         
     if voronoi_weight == True:
-        voronoi_kdtree = spatial.cKDTree(clusters.iloc[:, :-1].values)
+        voronoi_kdtree = cKDTree(clusters.iloc[:, :-1].values)
+        points_dist, points_regions = voronoi_kdtree.query(df.values)
+        region_percentage = []
+
+        for x in range(len(clusters)):
+            no_points_in_region = [y for y in points_regions if y == x]
+            no_points_in_region = len(no_points_in_region)
+            region_percentage.append(no_points_in_region/len(points_regions))
+        clusters['weight'] = region_percentage
+    
+    return clusters
+
+def anti_neighbors_vectorized(df, k, index, maxi = 1, mini = 0, dirnorm = 180, nkmeans = 0, voronoi_weight = True):
+    ''' Search the k farthest neighbors. This fx calls "normalize_df" and "unnormalize_df" as auxiliary functions
+        If the search space and the number of requested clusters is large, a high amounth of memory will be needed.
+        In case the data doesn't fit in your memory, you can use the version with foor loops or the dask paralelized.
+        Parameters
+            df: dataframe
+                input data from where the clusters will be extracted
+            k: int
+                number of clusters wanted
+            index: list
+               list with binary values. It must has 1 at index where dataframe columns 
+                arent directions and 0 where the columns are directions.
+            maxi: float
+                max value of the normalized array
+            mini: float
+                min value of the normalized array
+            dirnorm = float
+                value used for the normalization of direction arrays
+  
+        Returns
+            clusters: dataframe
+            
+        FOR MORE HELP SEE THE DOCSTRINGS OF normalize_df and unnormalize_df functios!
+            
+    '''
+    
+    norm = normalize_df(df, index)
+    
+    a, b = [], []
+    for i, j in enumerate(index):
+        if j == 0:
+            b.append(i)
+        elif j == 1:
+            a.append(i)
+            
+    for ib, bi in enumerate(b):
+        aux = norm.iloc[:, bi].values
+        m1 = np.broadcast_to(aux, (len(norm), len(norm)))
+        if ib == 0:
+            mdir = np.minimum(np.abs(m1 - m1.T), 2 - np.abs(m1 - m1.T))
+        else:
+            mdir = mdir + np.minimum(np.abs(m1 - m1.T), 2 - np.abs(m1 - m1.T))
+
+    aux = norm.iloc[:, a].values
+    msca = cdist(aux, aux, metric = 'sqeuclidean')
+
+    m = (msca + mdir)
+    del msca
+    del mdir
+    
+    points = [tuple(x) for x in norm.values]
+    dummy_index = list(df.index.values)
+    remaining_points = points[:]
+    solution_set = []
+    index_solution_set = []
+
+    tree = cKDTree(norm.values)
+    meanvalue = list(norm.mean())
+    ix_meanvalue = tree.query(meanvalue)[1]
+
+    solution_set.append(points[ix_meanvalue])
+    index_solution_set.append(dummy_index[ix_meanvalue])
+
+    #while len(solution_set) < k:
+    for _ in tqdm(range(k - 1)):
+        if len(solution_set) == 1:
+            ## iter 1, easy one
+            #distances = m[index_solution_set[-1], :]
+            newSolIx = m[index_solution_set[-1], :].argmax()
+            # newSolIx = distances.argmax()
+            solution_set.append(points[newSolIx])
+            index_solution_set.append(newSolIx)
+        else:
+            ## iter 2, starts to get complicated
+            # distances = np.minimum(distances, m[index_solution_set[-1], :])
+            # newSolIx = distances.argmax()
+            newSolIx = np.min(m[index_solution_set, :], axis = 0).argmax()
+            solution_set.append(points[newSolIx])
+            index_solution_set.append(newSolIx)
+            
+    normclusters = pd.DataFrame(columns = df.columns, data = solution_set)
+    clusters = unnormalize_df(df, normclusters, index)
+    clusters['index_cluster'] = index_solution_set
+    
+    if voronoi_weight == True:
+        voronoi_kdtree = cKDTree(clusters.iloc[:, :-1].values)
+        points_dist, points_regions = voronoi_kdtree.query(df.values)
+        region_percentage = []
+
+        for x in range(len(clusters)):
+            no_points_in_region = [y for y in points_regions if y == x]
+            no_points_in_region = len(no_points_in_region)
+            region_percentage.append(no_points_in_region/len(points_regions))
+        clusters['weight'] = region_percentage
+    
+    return clusters
+    
+def anti_neighbors_parallel(df, k, index, chunks, maxi = 1, mini = 0, dirnorm = 180, nkmeans = 0, voronoi_weight = True):
+    ''' Search the k farthest neighbors. This fx calls "normalize_df" and "unnormalize_df" as auxiliary functions
+        Recommended when the data is to large for the available memory
+        Parameters
+            df: dataframe
+                input data from where the clusters will be extracted
+            k: int
+                number of clusters wanted
+            index: list
+               list with binary values. It must has 1 at index where dataframe columns 
+                arent directions and 0 where the columns are directions.
+            maxi: float
+                max value of the normalized array
+            mini: float
+                min value of the normalized array
+            dirnorm = float
+                value used for the normalization of direction arrays
+  
+        Returns
+            clusters: dataframe
+            
+        FOR MORE HELP SEE THE DOCSTRINGS OF normalize_df and unnormalize_df functios!
+    '''
+    
+    norm = normalize_df(df, index)
+    
+    a, b = [], []
+    for i, j in enumerate(index):
+        if j == 0:
+            b.append(i)
+        elif j == 1:
+            a.append(i)
+            
+    ch = chunks
+    for ib, bi in enumerate(b):
+        aux = da.from_array(norm.iloc[:, bi].values, chunks = ch)
+        m1 = da.broadcast_to(aux, (len(norm), len(norm)))
+        if bi == 0:
+            mdir = da.minimum(da.abs(m1 - m1.T), 2 - da.abs(m1 - m1.T))
+        else:
+            mdir = da.sum(mdir + da.minimum(da.abs(m1 - m1.T), 2 - da.abs(m1 - m1.T)))
+
+    aux = da.from_array(norm.iloc[:, a].values, chunks = ch)
+    msca = ddist.cdist(aux, aux, metric = 'sqeuclidean')
+
+    m = msca + mdir
+    
+    points = [tuple(x) for x in norm.values]
+    dummy_index = list(df.index.values)
+    remaining_points = points[:]
+    solution_set = []
+    index_solution_set = []
+
+    tree = cKDTree(norm.values)
+    meanvalue = list(norm.mean())
+    ix_meanvalue = tree.query(meanvalue)[1]
+
+    solution_set.append(points[ix_meanvalue])
+    index_solution_set.append(dummy_index[ix_meanvalue])
+
+    while len(solution_set) < k:
+        t0 = time.time()
+        if len(solution_set) == 1:
+            ## iter 1, easy one
+            distances = m[index_solution_set[-1], :]
+            newSolIx = da.argmax(distances)
+            solution_set.append(points[newSolIx])
+            index_solution_set.append(newSolIx)
+        
+        else:
+            ## iter 2, starts to get complicated
+            distances = da.minimum(distances, m[index_solution_set[-1], :])
+            newSolIx = da.argmax(distances)
+            solution_set.append(points[newSolIx])
+            index_solution_set.append(newSolIx)
+            
+        print(f'Iter {time.time() - t0:0.4f}: s')
+    normclusters = pd.DataFrame(columns = df.columns, data = solution_set)
+    clusters = unnormalize_df(df, normclusters, index)
+    clusters['index_cluster'] = index_solution_set
+    
+    if voronoi_weight == True:
+        voronoi_kdtree = cKDTree(clusters.iloc[:, :-1].values)
         points_dist, points_regions = voronoi_kdtree.query(df.values)
         region_percentage = []
 
