@@ -1,0 +1,14 @@
+name: concorde01
+channels:
+ - conda-forge
+dependencies:
+ - numpy
+ - tqdm
+ - pandas
+ - scikit-learn
+ - scipy
+ - dask-distance
+ - opencv
+ - statsmodels
+ - matplotlib
+ - seaborn
