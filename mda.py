@@ -353,7 +353,7 @@ def anti_neighbors_parallel(df, k, index, chunks, maxi = 1, mini = 0, dirnorm = 
         if bi == 0:
             mdir = da.minimum(da.abs(m1 - m1.T), 2 - da.abs(m1 - m1.T))
         else:
-            mdir = da.sum(mdir + da.minimum(da.abs(m1 - m1.T), 2 - da.abs(m1 - m1.T)))
+            mdir = mdir + da.minimum(da.abs(m1 - m1.T), 2 - da.abs(m1 - m1.T))
 
     aux = da.from_array(norm.iloc[:, a].values, chunks = ch)
     msca = ddist.cdist(aux, aux, metric = 'sqeuclidean')
