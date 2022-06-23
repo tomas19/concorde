@@ -353,7 +353,7 @@ def anti_neighbors_parallel(df, k, index, chunks, maxi = 1, mini = 0, dirnorm = 
         if bi == 0:
             mdir = da.minimum(da.abs(m1 - m1.T), 2 - da.abs(m1 - m1.T))
         else:
-            mdir = mdir + da.minimum(da.abs(m1 - m1.T), 2 - da.abs(m1 - m1.T))
+            mdir = da.sum(mdir + da.minimum(da.abs(m1 - m1.T), 2 - da.abs(m1 - m1.T)))
 
     aux = da.from_array(norm.iloc[:, a].values, chunks = ch)
     msca = ddist.cdist(aux, aux, metric = 'sqeuclidean')
@@ -373,8 +373,7 @@ def anti_neighbors_parallel(df, k, index, chunks, maxi = 1, mini = 0, dirnorm = 
     solution_set.append(points[ix_meanvalue])
     index_solution_set.append(dummy_index[ix_meanvalue])
 
-    #while len(solution_set) < k:
-    for _ in tqdm(range(k - 1)):
+    while len(solution_set) < k:
         t0 = time.time()
         if len(solution_set) == 1:
             ## iter 1, easy one
@@ -390,6 +389,7 @@ def anti_neighbors_parallel(df, k, index, chunks, maxi = 1, mini = 0, dirnorm = 
             solution_set.append(points[newSolIx])
             index_solution_set.append(newSolIx)
             
+        print(f'Iter {time.time() - t0:0.4f}: s')
     normclusters = pd.DataFrame(columns = df.columns, data = solution_set)
     clusters = unnormalize_df(df, normclusters, index)
     clusters['index_cluster'] = index_solution_set
