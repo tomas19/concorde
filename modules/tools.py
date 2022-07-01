@@ -1,5 +1,5 @@
 import os
-import cv2
+#import cv2
 
 def animate_list_imgs(imgs, fps, anim_name):
     ''' Function to animate list of images.
