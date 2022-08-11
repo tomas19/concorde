@@ -272,9 +272,11 @@ def anti_neighbors_vectorized(df, k, index, maxi = 1, mini = 0, dirnorm = 180, n
     solution_set = []
     index_solution_set = []
 
-    tree = cKDTree(norm.values)
+    # tree = cKDTree(norm.values)
     meanvalue = list(norm.mean())
-    ix_meanvalue = tree.query(meanvalue)[1]
+    mdist2mean = cdist(norm.values, np.reshape(meanvalue, (1, len(meanvalue))))
+    ix_meanvalue = np.argmin(mdist2mean)
+    # ix_meanvalue = tree.query(meanvalue)[1]
 
     solution_set.append(points[ix_meanvalue])
     index_solution_set.append(dummy_index[ix_meanvalue])
@@ -304,12 +306,15 @@ def anti_neighbors_vectorized(df, k, index, maxi = 1, mini = 0, dirnorm = 180, n
         voronoi_kdtree = cKDTree(clusters.iloc[:, :-1].values)
         points_dist, points_regions = voronoi_kdtree.query(df.values)
         region_percentage = []
+        region_npoints = []
 
         for x in range(len(clusters)):
             no_points_in_region = [y for y in points_regions if y == x]
             no_points_in_region = len(no_points_in_region)
+            region_npoints.append(no_points_in_region)
             region_percentage.append(no_points_in_region/len(points_regions))
         clusters['weight'] = region_percentage
+        clusters['npoints'] = region_npoints
     
     return clusters
     
