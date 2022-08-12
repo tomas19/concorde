@@ -79,7 +79,7 @@ def get_list(directory, ends = None, starts = None, contains = None, not_contain
     else:
         return listfiles
 
-def interpOut(ncObj, pnts, n = 3):
+def pntFromNC(ncObj, pnts, n = 3, variable = 'zeta_max'):
     ''' Interpolate adcirc results from the 3 nodes that forms the triangle in which
         a point lies in. Only work for time-constant netcdf files.
         Parameters
@@ -132,13 +132,34 @@ def interpOut(ncObj, pnts, n = 3):
         x = ncObj['x'][vs].data
         y = ncObj['y'][vs].data 
         ## variable to interpolate
-        z = ncObj['zeta_max'][vs].data
+        z = ncObj[variable][vs].data
         ## masked values to 0
         z[z < -1000] = np.nan
         ## define interpolation function
         f = interpolate.LinearNDInterpolator(list(zip(x, y)), z)
         ## interpolate
-        newz = float(f(pnts[i][0], pnts[i][1]))    
+        newz = float(f(pnts[i][0], pnts[i][1]))
         lnewz.append(newz)
         
     return lnewz
+    
+def closestPointIndex2D(xarray, yarray, xp, yp):
+    ''' Find index of closest point inside an array
+        of the requested points
+        Parameters
+            xarray, yarray: numpy arrays
+                coordinates of the array where to look
+            xp, yp: numpy arrays or floats
+                coordinates of the requested point(s) to
+                look for.
+        Return
+            mdi:int
+                index of the closest point(s)
+        
+    '''
+    arr = np.array(list(zip(xarray, yarray)))
+    p = np.array([xp, yp])
+    p = np.reshape(p, (1, len(p)))
+    dist = cdist(arr, p)
+    mdi = np.argmin(dist)
+    return mdi
