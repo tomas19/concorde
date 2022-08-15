@@ -163,3 +163,27 @@ def closestPointIndex2D(xarray, yarray, xp, yp):
     dist = cdist(arr, p)
     mdi = np.argmin(dist)
     return mdi
+
+def curvature(x, y):
+    ''' Curvature is a measure of deviance of a curve from being a straight line.
+        Based on: https://www.delftstack.com/howto/numpy/curvature-formula-numpy
+        Parameters
+            x, y: array
+                coordinates
+        Returns
+            curvature_val: array
+                values of the curvature
+    '''
+#     coordinates = zip(x, y)
+    x_t = np.gradient(x)
+    y_t = np.gradient(y)
+    vel = list(zip(x_t, y_t))
+    speed = np.sqrt(x_t **2 + y_t ** 2)
+    
+    ss_t = np.gradient(speed)
+    xx_t = np.gradient(x_t)
+    yy_t = np.gradient(y_t)
+
+    curvature_val = np.abs(xx_t * y_t - x_t * yy_t) / (x_t * x_t + y_t * y_t)**1.5
+    
+    return curvature_val
