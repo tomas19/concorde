@@ -189,7 +189,7 @@ def curvature(x, y):
     return curvature_val
     
 def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta'):
-    ''' Interpolate adcirc results from the 3 nodes that forms the triangle in which
+    ''' Interpolate adcirc results from the 3 nodes that forms the triangle in which 
         a point lies in for all timesteps
         Parameters
             ncObj: etCDF4._netCDF4.Dataset
