@@ -7,6 +7,7 @@ from scipy.spatial.distance import cdist
 from shapely.geometry import Polygon, Point
 from scipy import interpolate
 from tqdm import tqdm
+import pandas as pd
 #import cv2
 
 def animate_list_imgs(imgs, fps, anim_name):
