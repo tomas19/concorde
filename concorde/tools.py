@@ -298,3 +298,50 @@ def ascii_replace(filein, fileout, olds, news):
             lines[index[i]] = newlines[i]
         with open(fileout, 'w') as fout:
             fout.writelines(lines)
+
+def checkAcircLog(run):
+    ''' Read padcirc.XXXXX file to find the run time and the MPI status. 
+        The last edited file will be analyzed.
+        Parameters
+            prun: str
+                complete path of the adcirc run
+        Returns
+            dt: float
+                number of hours the run took
+            status: boolean
+                0 if finished correctly, 1 if not
+    '''
+    months = list(calendar.month_abbr)[1:]
+    logs = [os.path.join(run, x) for x in os.listdir(os.path.join(run)) if x.startswith('padcswan.') and '.csh' not in x]
+    if len(logs) == 0:
+        dt = 'empty'
+        status = 'not run'
+                                                           
+    ## sort by modification date
+    else:
+        logs.sort(key = lambda x: os.path.getmtime(x))
+        last_log = logs[-1]
+        with open(os.path.join(pathin, r, last_log), 'r') as fin:
+            lines = fin.readlines()
+            for line in lines:
+                if line.startswith('Started at'):
+                    startline = line.split()
+                    stime = startline[-2].split(':')
+                    sdate = datetime.datetime(int(startline[-1]), int(months.index(startline[3])), int(startline[4]), 
+                              int(stime[0]), int(stime[1]), int(stime[2]))
+                elif line.startswith('Terminated at'):
+                    endline = line.split()
+                    etime = endline[-2].split(':')
+                    edate = datetime.datetime(int(endline[-1]), int(months.index(endline[3])), int(endline[4]), 
+                              int(etime[0]), int(etime[1]), int(etime[2]))
+                elif line.startswith(' MPI terminated with Status = '):
+                    statusline = line.split()
+                    if statusline[-1] == '0':
+                        status = 0
+                    else:
+                        status = 1
+                else:
+                    pass
+        dt = (edate - sdate).total_seconds()/3600
+    
+    return dt, status
