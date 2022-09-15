@@ -302,12 +302,14 @@ def ascii_replace(filein, fileout, olds, news):
         with open(fileout, 'w') as fout:
             fout.writelines(lines)
 
-def checkAcircLog(run):
+def checkAcircLog(run, mtype = 'padcirc'):
     ''' Read padcirc.XXXXX file to find the run time and the MPI status. 
         The last edited file will be analyzed.
         Parameters
-            prun: str
+            run: str
                 complete path of the adcirc run
+            mtype: str
+                padcirc or padcswan
         Returns
             dt: float
                 number of hours the run took
@@ -316,7 +318,7 @@ def checkAcircLog(run):
     '''
     run  = Path(run)
     months = list(calendar.month_abbr)[1:]
-    logs = [run/x for x in os.listdir(run) if x.startswith('padcswan.') and '.csh' not in x]
+    logs = [run/x for x in os.listdir(run) if x.startswith(f'{mtype}.') and '.csh' not in x]
     if len(logs) == 0:
         dt = 'empty'
         status = 'not run'
