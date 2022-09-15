@@ -8,6 +8,9 @@ from shapely.geometry import Polygon, Point
 from scipy import interpolate
 from tqdm import tqdm
 import pandas as pd
+import calendar
+import datetime
+from pathlib import Path
 #import cv2
 
 def animate_list_imgs(imgs, fps, anim_name):
@@ -311,8 +314,9 @@ def checkAcircLog(run):
             status: boolean
                 0 if finished correctly, 1 if not
     '''
+    run  = Path(run)
     months = list(calendar.month_abbr)[1:]
-    logs = [os.path.join(run, x) for x in os.listdir(os.path.join(run)) if x.startswith('padcswan.') and '.csh' not in x]
+    logs = [run/x for x in os.listdir(run) if x.startswith('padcswan.') and '.csh' not in x]
     if len(logs) == 0:
         dt = 'empty'
         status = 'not run'
@@ -321,7 +325,7 @@ def checkAcircLog(run):
     else:
         logs.sort(key = lambda x: os.path.getmtime(x))
         last_log = logs[-1]
-        with open(os.path.join(pathin, r, last_log), 'r') as fin:
+        with open(run/last_log, 'r') as fin:
             lines = fin.readlines()
             for line in lines:
                 if line.startswith('Started at'):
