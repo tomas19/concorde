@@ -84,69 +84,26 @@ def get_list(directory, ends = None, starts = None, contains = None, not_contain
     else:
         return listfiles
 
-def pntFromNC(ncObj, pnts, n = 3, variable = 'zeta_max'):
-    ''' Interpolate adcirc results from the 3 nodes that forms the triangle in which
-        a point lies in. Only work for time-constant netcdf files.
+def checkTimeVarying(ncObj):
+    ''' Check if an adcirc input is time-varying or not.
         Parameters
-            ncObj: etCDF4._netCDF4.Dataset
+            ncObj: netCDF4._netCDF4.Dataset
                 Adcirc input file
-            pnts: list
-                list with ziped coordinates. Eg. [(x0, y0), (x1, y1), ....]
-            n: int, default 3
-                number of triangles considered to look in which one the point
-                is contained.
         Returns
-            lznew: list
-                list of interpolated results
+            timeVar: int
+                1 if time-varying, 0 if not
     '''
-    ## triangles
-    nv = ncObj['element'][:,:] - 1 ## triangles starts from 1
-    ## x and y coordinates
-    x = ncObj['x'][:].data
-    y = ncObj['y'][:].data
-    ## matplotlib triangulation
-    tri = mpl.tri.Triangulation(x, y, nv)
-    ## get the x and y coordinate of the triangle elements in the right order
-    xvertices = x[tri.triangles[:]]
-    yvertices = y[tri.triangles[:]]
-    ## add x and y togheter
-    listElem = np.stack((xvertices, yvertices), axis = 2)
-    ## vertex number of each node
-    v1 = nv.data[:, 0]
-    v2 = nv.data[:, 1]
-    v3 = nv.data[:, 2]
-    v = np.array((v1, v2, v3)).T  
-    ## get centroids
-    centx = xvertices.mean(axis = 1)
-    centy = yvertices.mean(axis = 1)
-    ## compute distance from all centroids to the requested points
-    mdist = cdist(list(zip(centx, centy)), pnts)
-    ## iterate through each point to find in what triangle is contained
-    lnewz = []
-    for i in range(len(pnts)):
-        ## selected only the n closest centroids
-        a = np.where(mdist[:, i] < sorted(mdist[:, i])[n])[0]
-        for ni in range(n):
-            ## define polygon
-            pol = Polygon(listElem[a[ni], :, :])
-            ## find the polygon that contains the point
-            if pol.contains(Point(pnts[i])):
-                vs = v[a[ni]]
-                break
-        
-        x = ncObj['x'][vs].data
-        y = ncObj['y'][vs].data 
-        ## variable to interpolate
-        z = ncObj[variable][vs].data
-        ## masked values to 0
-        z[z < -1000] = np.nan
-        ## define interpolation function
-        f = interpolate.LinearNDInterpolator(list(zip(x, y)), z)
-        ## interpolate
-        newz = float(f(pnts[i][0], pnts[i][1]))
-        lnewz.append(newz)
-        
-    return lnewz
+    if ncObj['time'].shape[0] <= 1:
+        ## not time-varying
+        timeVar = 0
+    elif (ncObj['time'][-1].data - ncObj['time'][0].data).astype(int) == 0:
+        ## time variable has lenght 2 but dates are the same --> not time-varying
+        timeVar = 0
+    else:
+        ## time-varying file
+        timeVar = 1
+    
+    return timeVar
     
 def closestPointIndex2D(xarray, yarray, xp, yp):
     ''' Find index of closest point inside an array
@@ -193,7 +150,7 @@ def curvature(x, y):
     
     return curvature_val
     
-def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta'):
+def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
     ''' Interpolate adcirc results from the 3 nodes that forms the triangle in which 
         a point lies in for all timesteps
         Parameters
@@ -204,6 +161,9 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta'):
             n: int, default 3
                 number of triangles considered to look in which one the point
                 is contained.
+            extractOut: boolean
+                True for extract data if the points are outside the domain. Defalt False,
+                nan will be returned in this case.
         Returns
             dfout: pandas dataframe
                 df with of interpolated results
@@ -233,10 +193,19 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta'):
     ## iterate through each point to find in what triangle is contained
     t0 = pd.to_datetime(ncObj['time'].units.split('since ')[1])
     dates = [t0 + pd.Timedelta(seconds = float(x)) for x in ncObj['time'][:]]
-    dfout = pd.DataFrame(columns = [f'Pnt{x:03d}' for x in range(len(pnts))], index = dates)
-    
-    for i in tqdm(range(len(pnts))):
+    dfout = pd.DataFrame(columns = [f'{variable}_pnt{x:03d}' for x in range(len(pnts))], index = dates)
+    ## check if nc file is time-varying
+    tvar = checkTimeVarying(ncObj)
+    if tvar == 1:
+        z = ncObj[variable][:, :].data
+    else:
+        ## reshape to add an extra dimension
+        z = ncObj[variable][:].data.reshape((1, ncObj[variable].size))
+    ## loop through points
+    for i in range(len(pnts)):
+        ## get the n centroid nearest to the point i
         a = np.where(mdist[:, i] < sorted(mdist[:, i])[n])[0]
+        ## iterate through each element to see is the point is inside
         for ni in range(n):
             lnewzti = []
             ## define polygon
@@ -245,17 +214,34 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta'):
             if pol.contains(Point(pnts[i])):
                 vs = v[a[ni]]
                 break
-
-        x = ncObj['x'][vs].data
-        y = ncObj['y'][vs].data 
-        ## variable to interpolate
-        z = ncObj[variable][:, vs].data
-        for zi in z:
-            f = interpolate.LinearNDInterpolator(list(zip(x, y)), zi)
-            newz = float(f(pnts[i][0], pnts[i][1]))
-            lnewzti.append(newz)
-        dfout[f'Pnt{i:03d}'] = lnewzti
-        dfout = dfout.replace(-99999.000000, np.nan)
+        ## point is inside the mesh
+        if 'vs' in locals():
+            print(f'Point {i:03d} is inside the domain! data was be interpolated.')
+            x = ncObj['x'][vs].data
+            y = ncObj['y'][vs].data 
+            ## variable to interpolate
+            zs = z[:, z]
+            for zi in zs:
+                f = interpolate.LinearNDInterpolator(list(zip(x, y)), zi)
+                newz = float(f(pnts[i][0], pnts[i][1]))
+                lnewzti.append(newz)
+            dfout[f'{variable}_pnt{i:03d}'] = lnewzti
+            
+        else:
+            ## point is outside the domain
+            if extractOut == True:
+                print(f'Point {i:03d} is outside the domain! data from nearest node was be exported.')
+                ## find nearest node to the requested point
+                mdist2 = cdist(list(zip(x[v[a[0]]], y[v[a[0]]])), np.reshape(pnts[i], (1, 2)))
+                clnode = mdist2.argmin()
+                newz = z[:, v[a[0]][clnode]]
+                lnewzti = newz.copy()
+                dfout[f'{variable}_pnt{i:03d}'] = lnewzti
+            else:
+                print(f'Point {i:03d} is outside the domain! Returning nan.')
+                dfout[f'{variable}_pnt{i:03d}'] = np.nan
+        
+    dfout = dfout.replace(-99999.000000, np.nan)
     
     return dfout
     
