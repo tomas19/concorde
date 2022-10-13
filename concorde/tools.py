@@ -1,5 +1,7 @@
 import os
 import sys
+import netCDF4 as netcdf
+import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import geopandas as gpd
@@ -220,7 +222,7 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
             x = ncObj['x'][vs].data
             y = ncObj['y'][vs].data 
             ## variable to interpolate
-            zs = z[:, z]
+            zs = z[:, vs]
             for zi in zs:
                 f = interpolate.LinearNDInterpolator(list(zip(x, y)), zi)
                 newz = float(f(pnts[i][0], pnts[i][1]))
