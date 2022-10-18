@@ -1,9 +1,11 @@
+from time import time
 import numpy as np
 import pandas as pd
 from scipy import interpolate
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import contextily as cxt
+import datetime
 from sklearn.neighbors import KDTree
 
 def scatter_interpolate(x,y,res=17,method='cubic',normalise=True, return_res = False):
@@ -70,7 +72,7 @@ def scatter_interpolate(x,y,res=17,method='cubic',normalise=True, return_res = F
 def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None, 
            vecsc = None, veccolor = 'k', xlims = None, ylims = None, 
            cbar = False, gdf = None, ts = None, ax = None, fig = None, 
-           cmap = 'viridis', fsize = (8, 6), cb_shrink = 1, cb_label = None):
+           cmap = 'viridis', fsize = (8, 6), cb_shrink = 1, cb_label = None, latpath = None, lonpath = None):
     ''' Funtion to create 2D plots from netcdf files. WIP
         Parameters:
             nc: netcdf object
@@ -81,6 +83,10 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
                 contours to plot
             xlims, ylims: list
                 limits of the plot
+            latpath: list
+                latitude values for storm path
+            lonpath: list
+                longitude values for storm path
     '''
     
     tri = mpl.tri.Triangulation(nc['x'][:].data, nc['y'][:].data, nc['element'][:,:] - 1)
@@ -115,6 +121,36 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
         cb.set_label(cb_label)
     if gdf is not None:
         gdf.plot(ax = ax, color = 'r')
+    
+    #Create date string
+    startdate = nc['time'].units.split('since')[1]
+    startdate = pd.Timestamp(startdate)
+    x = int(nc['time'][ts].data)
+    date = startdate + datetime.timedelta(seconds = x)    
+
+    #Create timestep string
+    timestep = 'Timestep ' + str(ts).zfill(3)
+    
+    #Add date and timestep as footer
+    ax.annotate(date,
+            xy = (0, 0.98),
+            xycoords='axes fraction',
+            ha='left',
+            va="center",
+            fontsize=10)
+    ax.annotate(timestep,
+            xy = (0, 0.95),
+            xycoords='axes fraction',
+            ha='left',
+            va="center",
+            fontsize=10)
+
+    #Plot storm path from lonpath and latpath
+    if latpath is not None:
+        xlist = lonpath #list
+        ylist = latpath #list
+        ax.plot(xlist, ylist, color = 'saddlebrown')
+
     return ax
     
 def res_nodes_for_plot_vectors(ncObj, dx, dy):
