@@ -1,4 +1,4 @@
-from time import time
+#from time import time
 import numpy as np
 import pandas as pd
 from scipy import interpolate
@@ -149,7 +149,7 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
     if latpath is not None:
         xlist = lonpath #list
         ylist = latpath #list
-        ax.plot(xlist, ylist, color = 'saddlebrown')
+        ax.plot(xlist, ylist, color = 'k', ls = '--')
 
     return ax
     
