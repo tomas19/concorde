@@ -218,21 +218,22 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
                 break
         ## point is inside the mesh
         if 'vs' in locals():
-            print(f'Point {i:03d} is inside the domain! data was be interpolated.')
-            x = ncObj['x'][vs].data
-            y = ncObj['y'][vs].data 
+            print(f'Point {i:03d} is inside the domain! data was interpolated.')
+            xs = ncObj['x'][vs].data
+            ys = ncObj['y'][vs].data 
             ## variable to interpolate
             zs = z[:, vs]
             for zi in zs:
-                f = interpolate.LinearNDInterpolator(list(zip(x, y)), zi)
+                f = interpolate.LinearNDInterpolator(list(zip(xs, ys)), zi)
                 newz = float(f(pnts[i][0], pnts[i][1]))
                 lnewzti.append(newz)
             dfout[f'{variable}_pnt{i:03d}'] = lnewzti
+            del vs
             
         else:
             ## point is outside the domain
             if extractOut == True:
-                print(f'Point {i:03d} is outside the domain! data from nearest node was be exported.')
+                print(f'Point {i:03d} is outside the domain! data from nearest node was exported.')
                 ## find nearest node to the requested point
                 mdist2 = cdist(list(zip(x[v[a[0]]], y[v[a[0]]])), np.reshape(pnts[i], (1, 2)))
                 clnode = mdist2.argmin()
