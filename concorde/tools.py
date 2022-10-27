@@ -13,7 +13,9 @@ import pandas as pd
 import calendar
 import datetime
 from pathlib import Path
-#import cv2
+import cv2
+from itertools import islice
+from sklearn.neighbors import KDTree
 
 def animate_list_imgs(imgs, fps, anim_name):
     ''' Function to animate list of images.
@@ -340,3 +342,127 @@ def checkAcircLog(run, mtype = 'padcirc'):
         dt = (edate - sdate).total_seconds()/3600
     
     return dt, status
+
+def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
+    ''' Function to interpolate the fort.13 from one mesh to another using
+        nearest neighbor
+        Parameters
+            fort14_old: str
+                full path of the original fort.14
+            fort13_old: str
+                full path of the original fort.13
+            fort14_new: str
+                full path of the new fort.14
+            fort13_new: str
+                full path of the new fort.13, a new file will be created
+            attrs: dictionary
+                attributes to consider in the new fort.13
+                Currently the keys are the exact same name of the attributs and the items
+                are ints with the number of lines per attribute in the hader information.
+                As far as I know, all attrs always have three lines. In case this is always
+                true this input needs to be changed to a list. e.g.
+                attrs = {
+                         'surface_directional_effective_roughness_length': 3,
+                         'surface_canopy_coefficient': 3,
+                         'mannings_n_at_sea_floor': 3,
+                         'primitive_weighting_in_continuity_equation': 3,
+                         'average_horizontal_eddy_viscosity_in_sea_water_wrt_depth': 3,
+                         'elemental_slope_limiter': 3
+                        }
+        Return
+            None
+    '''
+    ## open old fort.14 to get number of nodes and elements
+    with open(fort14_old) as fin:
+        head_old = list(islice(fin, 2))
+        data_old = [int(x) for x in head_old[1].split()]
+    ## read only nodes as an array of x,y
+    nodes_old = np.loadtxt(fort14_old, skiprows = 2, max_rows = data_old[1], 
+                           usecols = (1, 2))
+    
+    ## idem for new fort.14
+    with open(fort14_new) as fin:
+        head_new = list(islice(fin, 2))
+        data_new = [int(x) for x in head_new[1].split()]
+    nodes_new = np.loadtxt(fort14_new, skiprows = 2, max_rows = data_new[1], 
+                           usecols = (1, 2))
+    
+    ## nearest neighbor interpolation --> the closest node of the new mesh is
+    ## assign to each of the nodes of the old mesh.
+    tree = KDTree(nodes_old)
+    dist, ind = tree.query(nodes_new)
+    ## dataframe with new nodes and the closest old node assigned to each one
+    dfnew = pd.DataFrame({'x': nodes_new[:, 0], 'y': nodes_new[:, 1], 'old_id':ind.reshape(-1)})
+    
+    ## open the old fort.13 in read mode to read the data
+    with open(fort13_old, 'r') as fin:
+        ## open the new fort.13 in writing mode to dump the interpolated information
+        with open(fort13_new, 'w') as fout:
+            ## write header in to the new fort.13: titile, number of nodes and number of
+            ## attributes.
+            fout.write(f'Spatial attributes descrption. File generated with NNfort13 on {datetime.date.today()} using {fort14_old} and {fort13_old} as basefiles, and {fort14_new} as the new mesh\n')
+            fout.write(f'{data_new[1]}\n')
+            fout.write(f'{len(attrs.keys())}\n')## write
+            
+            ## Inside this for loop we are writing the name, default value and other
+            ## parameters of each of the selected attributes
+            lines = fin.readlines()[3:]
+            for key in attrs.keys():
+                ## index of the attribute
+                ind = lines.index(key+'\n')
+                ## write default values and extra info per attribute
+                ## lines from index of attr to the int in the item of that specific
+                ## key es written.
+                fout.writelines(lines[ind:ind+1+attrs[key]])
+            
+            ## From this line the value of the attrs for each node es written.
+            for key in tqdm(attrs.keys()):
+                ## get index of 1st and 2nd time the attr key appears in the file
+                inds = [i for i, n in enumerate(lines) if n == key+'\n'][:2]
+                try:
+                    ## read default value, try and except block is due to the 
+                    ## surface_directional_effective_roughness_length, which is a typically
+                    ## a list of 12 values
+                    defval = lines[inds[0]+3].split()
+                    ## convert from str to float
+                    defval = [float(x) for x in defval]
+                except:
+                    ## in case the values are not a list
+                    defval = [float(lines[inds[0]+3][:-1])]
+                
+                ## index where the values will be dumped
+                indi = inds[1] + 2
+                ## number of nodes with non default value
+                nnondef = int(lines[int(inds[1] + 1)][:-1])
+                ## index where the nodes of the attr finish
+                indf = indi + nnondef - 1
+                ## read the lines between previous defined indices as dataframes
+                ## only nodes with non default values
+                olds = pd.read_csv(fort13_old, skiprows = indi + 3, nrows = indf - indi + 1, header = None, sep = ' ', index_col = 0)
+                ## not sure why this dataframe is not writable: olds_all_aux.values.flags will show the array is not writable. Fixed with copy
+                ## array for store the value of all nodes, not only the non-default
+                olds_all_aux = pd.DataFrame(columns = olds.columns, index = range(1, data_old[1] + 1),
+                                            data = np.broadcast_to(np.array(defval), (data_old[1], len(defval))))
+                olds_all = olds_all_aux.copy()
+                ## add info of nodes with default value
+                olds_all.loc[olds.index, :] = olds.values
+                ## dataframe with attr values for the nodes of the new mesh
+                ## this is done selecting the data of the old data for the closest old
+                ## node associated to each of the new nodes
+                news_all = olds_all.loc[dfnew['old_id'] + 1, :]
+                news_all.index = range(len(news_all))
+                ## get the nodes with default value
+                dfdef = news_all[news_all == defval].dropna()
+                ## get nodes with non-default value
+                dfnondef = news_all[news_all != defval].dropna()
+                dfnondef = dfnondef.sort_index()
+                dfnondef['dummy'] = '\n'
+                ## write attribute name
+                fout.write(key + '\n')
+                ## write number of non default nodes
+                fout.write(str(len(dfnondef)) + '\n')
+                ## format the data to write it to the new fort.13 file
+                dfaux = pd.DataFrame({'x': dfnondef.index}, index = dfnondef.index)
+                new_lines = pd.concat([dfaux, dfnondef], axis = 1)
+                new_lines2 = [' '.join([str(x) for x in new_lines.loc[i, :]]) for i in new_lines.index]
+                fout.writelines(new_lines2)
