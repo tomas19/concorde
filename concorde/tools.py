@@ -450,7 +450,7 @@ def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
                 ## this is done selecting the data of the old data for the closest old
                 ## node associated to each of the new nodes
                 news_all = olds_all.loc[dfnew['old_id'] + 1, :]
-                news_all.index = range(len(news_all))
+                news_all.index = range(1, len(news_all) + 1)
                 ## get the nodes with default value
                 dfdef = news_all[news_all == defval].dropna()
                 ## get nodes with non-default value
