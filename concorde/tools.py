@@ -13,7 +13,7 @@ import pandas as pd
 import calendar
 import datetime
 from pathlib import Path
-import cv2
+#import cv2
 from itertools import islice
 from sklearn.neighbors import KDTree
 
