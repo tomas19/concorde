@@ -1,4 +1,3 @@
-#from time import time
 import numpy as np
 import pandas as pd
 from scipy import interpolate
@@ -72,21 +71,48 @@ def scatter_interpolate(x,y,res=17,method='cubic',normalise=True, return_res = F
 def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None, 
            vecsc = None, veccolor = 'k', xlims = None, ylims = None, 
            cbar = False, gdf = None, ts = None, ax = None, fig = None, 
-           cmap = 'viridis', fsize = (8, 6), cb_shrink = 1, cb_label = None, latpath = None, lonpath = None):
+           cmap = 'viridis', fsize = (8, 6), cb_shrink = 1, cb_label = None, 
+           latpath = None, lonpath = None, background_map = False):
     ''' Funtion to create 2D plots from netcdf files. WIP
         Parameters:
             nc: netcdf object
-                adcirc file already loaded to memory
+                adcirc file already loaded to memory to plot as contours
             var: string
                 name of the variable to plot. E.g. 'zeta', 'zeta_max'
             levels: numpy array
                 contours to plot
+            ncvec: netcdf object. Default None
+                adcirc file already loaded to memory to plot as vectors. E.g: wind or current vectors
+            dxvec, dyvec: float. Default None
+                spacing of the vectors
+            vecsc: int or float. Default None
+                scale of the vectors.500 works well.
+            veccolor: string. Default black ('k')
+                color of the vectors
             xlims, ylims: list
                 limits of the plot
+            cbar: boolean. Default False
+                True for adding colorbar
+            gdf: GeoDataFrame
+                usefull to overlay info, check if this not enough for ploting the track? REVIEW
+            ts: int
+                timestep for plotting time-varying adcirc outputs
+            ax: matplotlib axis
+            fig: matplotlib figure
+            cmap: string
+                name of the cmap. For maxele viridis is recommended, but for fort.63 seismic works well
+            fsize: tuple
+                figure of the output size if fig and ax are not specified
+            cb_shrink: float
+                useful to define size of colorbar
+            cb_label: string
+                colorbar label
             latpath: list
                 latitude values for storm path
             lonpath: list
                 longitude values for storm path
+            background_map: boolean
+                True for using contextily to plot a background map, doesn't work on the HPC
     '''
     
     tri = mpl.tri.Triangulation(nc['x'][:].data, nc['y'][:].data, nc['element'][:,:] - 1)
@@ -113,7 +139,8 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
         ax.set_xlim(xlims)
     if ylims is not None:
         ax.set_ylim(ylims)
-    cxt.add_basemap(ax, crs = 'EPSG:4326', source=cxt.providers.Stamen.Terrain)
+    if background_map == True:
+        cxt.add_basemap(ax, crs = 'EPSG:4326', source=cxt.providers.Stamen.Terrain)
     ax.set_xlabel('Longitude [deg]')
     ax.set_ylabel('Latitude [deg]')
     if cbar == True:
@@ -122,28 +149,21 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
     if gdf is not None:
         gdf.plot(ax = ax, color = 'r')
     
-    #Create date string
-    startdate = nc['time'].units.split('since')[1]
-    startdate = pd.Timestamp(startdate)
-    x = int(nc['time'][ts].data)
-    date = startdate + datetime.timedelta(seconds = x)    
+    if ts is not None:
+        #Create date string
+        startdate = nc['time'].units.split('since')[1]
+        startdate = pd.Timestamp(startdate)
+        x = int(nc['time'][ts].data)
+        date = startdate + datetime.timedelta(seconds = x)
 
-    #Create timestep string
-    timestep = 'Timestep ' + str(ts).zfill(3)
-    
-    #Add date and timestep as footer
-    ax.annotate(date,
-            xy = (0, 0.98),
-            xycoords='axes fraction',
-            ha='left',
-            va="center",
-            fontsize=10)
-    ax.annotate(timestep,
-            xy = (0, 0.95),
-            xycoords='axes fraction',
-            ha='left',
-            va="center",
-            fontsize=10)
+        #Create timestep string
+        timestep = 'Timestep ' + str(ts).zfill(3)
+        
+        #Add date and timestep as footer
+        ax.annotate(date, xy = (0, 0.98), xycoords='axes fraction',
+                    ha='left', va="center", fontsize=10)
+        ax.annotate(timestep, xy = (0, 0.95), xycoords='axes fraction',
+                    ha='left', va="center", fontsize=10)
 
     #Plot storm path from lonpath and latpath
     if latpath is not None:
@@ -154,7 +174,15 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
     return ax
     
 def res_nodes_for_plot_vectors(ncObj, dx, dy):
-    '''
+    ''' Resample nodes to plot vectors within the plot2D function
+        Parameters
+            ncObj: netcdf object. Default None
+                adcirc file already loaded to memory to plot as vectors. E.g: wind or current vectors
+            dx, dy: float. Default None
+                spacing of the vectors
+        Return:
+            ind: list
+                indices of the selected nodes
     '''
     maxx = np.max(ncObj['x'][:].data)
     minx = np.min(ncObj['x'][:].data)

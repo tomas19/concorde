@@ -293,7 +293,7 @@ def ascii_replace(filein, fileout, olds, news):
         with open(fileout, 'w') as fout:
             fout.writelines(lines)
 
-def checkAcircLog(run, mtype = 'padcirc'):
+def checkAdcircLog(run, mtype = 'padcirc'):
     ''' Read padcirc.XXXXX file to find the run time and the MPI status. 
         The last edited file will be analyzed.
         Parameters
@@ -305,7 +305,8 @@ def checkAcircLog(run, mtype = 'padcirc'):
             dt: float
                 number of hours the run took
             status: boolean
-                0 if finished correctly, 1 if not
+                0 if finished correctly, 1 if crashed, 2 if time limit
+                reached and 'Still running'
     '''
     run  = Path(run)
     months = list(calendar.month_abbr)[1:]
@@ -333,13 +334,17 @@ def checkAcircLog(run, mtype = 'padcirc'):
                               int(etime[0]), int(etime[1]), int(etime[2]))
                 elif line.startswith(' MPI terminated with Status = '):
                     statusline = line.split()
-                    if statusline[-1] == '0':
-                        status = 0
-                    else:
-                        status = 1
+                    status = statusline[-1]
+                elif line.startswith('User defined signal 2'):
+                    status = 'Time limit reached'
                 else:
                     pass
-        dt = (edate - sdate).total_seconds()/3600
+            if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
+                status = 'Still running '
+        try:
+            dt = (edate - sdate).total_seconds()/3600
+        except:
+            dt = 0
     
     return dt, status
 
