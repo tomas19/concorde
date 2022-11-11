@@ -444,6 +444,14 @@ def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
                 ## read the lines between previous defined indices as dataframes
                 ## only nodes with non default values
                 olds = pd.read_csv(fort13_old, skiprows = indi + 3, nrows = indf - indi + 1, header = None, sep = ' ', index_col = 0)
+                ## problem when first column of the org fort 13 has whitespaces, the real node index won't be in the index
+                if np.isnan(olds.index).all() == True:
+                    olds = olds.copy()
+                    olds.index = olds.iloc[:, 0]
+                    olds = olds.drop([1], axis = 1)
+                    olds.columns = range(1, len(olds.columns) + 1)
+                else:
+                    pass                
                 ## not sure why this dataframe is not writable: olds_all_aux.values.flags will show the array is not writable. Fixed with copy
                 ## array for store the value of all nodes, not only the non-default
                 olds_all_aux = pd.DataFrame(columns = olds.columns, index = range(1, data_old[1] + 1),
