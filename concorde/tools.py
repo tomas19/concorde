@@ -362,10 +362,12 @@ def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
                 full path of the new fort.13, a new file will be created
             attrs: dictionary
                 attributes to consider in the new fort.13
-                Currently the keys are the exact same name of the attributs and the items
-                are ints with the number of lines per attribute in the hader information.
-                As far as I know, all attrs always have three lines. In case this is always
-                true this input needs to be changed to a list. e.g.
+                Currently the keys of the are **the exact same name** of the attributes, be careful
+                with empty spaces (this will be fixed soon, WIP).
+                The items are integers with the number of lines per attribute in the hader information.
+                (WIP: As far as I know, all attrs always have three lines In case this is always
+                true this input needs to be changed to a list). 
+                E.g.
                 attrs = {
                          'surface_directional_effective_roughness_length': 3,
                          'surface_canopy_coefficient': 3,
@@ -441,41 +443,46 @@ def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
                 nnondef = int(lines[int(inds[1] + 1)][:-1])
                 ## index where the nodes of the attr finish
                 indf = indi + nnondef - 1
-                ## read the lines between previous defined indices as dataframes
-                ## only nodes with non default values
-                olds = pd.read_csv(fort13_old, skiprows = indi + 3, nrows = indf - indi + 1, header = None, sep = ' ', index_col = 0)
-                ## problem when first column of the org fort 13 has whitespaces, the real node index won't be in the index
-                if np.isnan(olds.index).all() == True:
-                    olds = olds.copy()
-                    olds.index = olds.iloc[:, 0]
-                    olds = olds.drop([1], axis = 1)
-                    olds.columns = range(1, len(olds.columns) + 1)
+                ## read data only there are more than 0 non default vertices
+                if nnondef > 0:
+                    ## read the lines between previous defined indices as dataframes
+                    olds = pd.read_csv(fort13_old, skiprows = indi + 3, nrows = indf - indi + 1, header = None, sep = ' ', index_col = 0)
+                    ## problem when first column of the org fort 13 has whitespaces, the index is nan and an extra column
+                    ## with the vertex id is added to the dataframe
+                    if np.isnan(olds.index).all() == True:
+                        olds.index = olds.iloc[:, 0]
+                        olds = olds.drop([1], axis = 1)
+                        olds.columns = range(1, len(olds.columns) + 1)
+                    else:
+                        pass
+                    ## not sure why this dataframe is not writable: olds_all_aux.values.flags will show the array is not writable. Fixed with copy
+                    ## array for store the value of all nodes, not only the non-default
+                    olds_all_aux = pd.DataFrame(columns = olds.columns, index = range(1, data_old[1] + 1),
+                                                data = np.broadcast_to(np.array(defval), (data_old[1], len(defval))))
+                    olds_all = olds_all_aux.copy()
+                    ## add info of nodes with default value
+                    olds_all.loc[olds.index, :] = olds.values
+                    ## dataframe with attr values for the nodes of the new mesh
+                    ## this is done selecting the data of the old data for the closest old
+                    ## node associated to each of the new nodes
+                    news_all = olds_all.loc[dfnew['old_id'] + 1, :]
+                    news_all.index = range(1, len(news_all) + 1)
+                    ## get the nodes with default value
+                    dfdef = news_all[news_all == defval].dropna()
+                    ## get nodes with non-default value
+                    dfnondef = news_all[news_all != defval].dropna()
+                    dfnondef = dfnondef.sort_index()
+                    dfnondef['dummy'] = '\n'
+                    ## write attribute name
+                    fout.write(key + '\n')
+                    ## write number of non default nodes
+                    fout.write(str(len(dfnondef)) + '\n')
+                    ## format the data to write it to the new fort.13 file
+                    dfaux = pd.DataFrame({'x': dfnondef.index}, index = dfnondef.index)
+                    new_lines = pd.concat([dfaux, dfnondef], axis = 1)
+                    new_lines2 = [' '.join([str(x) for x in new_lines.loc[i, :]]) for i in new_lines.index]
+                    fout.writelines(new_lines2)
                 else:
-                    pass                
-                ## not sure why this dataframe is not writable: olds_all_aux.values.flags will show the array is not writable. Fixed with copy
-                ## array for store the value of all nodes, not only the non-default
-                olds_all_aux = pd.DataFrame(columns = olds.columns, index = range(1, data_old[1] + 1),
-                                            data = np.broadcast_to(np.array(defval), (data_old[1], len(defval))))
-                olds_all = olds_all_aux.copy()
-                ## add info of nodes with default value
-                olds_all.loc[olds.index, :] = olds.values
-                ## dataframe with attr values for the nodes of the new mesh
-                ## this is done selecting the data of the old data for the closest old
-                ## node associated to each of the new nodes
-                news_all = olds_all.loc[dfnew['old_id'] + 1, :]
-                news_all.index = range(1, len(news_all) + 1)
-                ## get the nodes with default value
-                dfdef = news_all[news_all == defval].dropna()
-                ## get nodes with non-default value
-                dfnondef = news_all[news_all != defval].dropna()
-                dfnondef = dfnondef.sort_index()
-                dfnondef['dummy'] = '\n'
-                ## write attribute name
-                fout.write(key + '\n')
-                ## write number of non default nodes
-                fout.write(str(len(dfnondef)) + '\n')
-                ## format the data to write it to the new fort.13 file
-                dfaux = pd.DataFrame({'x': dfnondef.index}, index = dfnondef.index)
-                new_lines = pd.concat([dfaux, dfnondef], axis = 1)
-                new_lines2 = [' '.join([str(x) for x in new_lines.loc[i, :]]) for i in new_lines.index]
-                fout.writelines(new_lines2)
+                    ## write attr with only default values
+                    fout.write(key + '\n')
+                    fout.write('0')
