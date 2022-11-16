@@ -337,8 +337,8 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                     status = statusline[-1]
                 elif line.startswith('User defined signal 2'):
                     status = 'Time limit reached'
-                elif line.startswith('=   EXIT CODE: 9'):
-                    status = 'Exited with code9'
+                elif line.startswith('=   EXIT CODE:'):
+                    status = line[4:-1]
                 else:
                     pass
             if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
@@ -347,6 +347,10 @@ def checkAdcircLog(run, mtype = 'padcirc'):
             dt = (edate - sdate).total_seconds()/3600
         except:
             dt = 0
+        try:
+            status
+        except NameError:
+            status = 'Error no catched, check log manually' 
     
     return dt, status
 
