@@ -171,6 +171,8 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
         Returns
             dfout: pandas dataframe
                 df with of interpolated results
+            rep: list
+                strings with information about how the data was extracted
     '''
     ## triangles
     nv = ncObj['element'][:,:] - 1 ## triangles starts from 1
@@ -206,7 +208,8 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
         ## reshape to add an extra dimension
         z = ncObj[variable][:].data.reshape((1, ncObj[variable].size))
     ## loop through points
-    for i in range(len(pnts)):
+    rep = []
+    for i in tqdm(range(len(pnts))):
         ## get the n centroid nearest to the point i
         a = np.where(mdist[:, i] < sorted(mdist[:, i])[n])[0]
         ## iterate through each element to see is the point is inside
@@ -220,7 +223,7 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
                 break
         ## point is inside the mesh
         if 'vs' in locals():
-            print(f'Point {i:03d} is inside the domain! data was interpolated.')
+            rep.append(f'Point {i:03d} is inside the domain! data was interpolated.')
             xs = ncObj['x'][vs].data
             ys = ncObj['y'][vs].data 
             ## variable to interpolate
@@ -235,7 +238,7 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
         else:
             ## point is outside the domain
             if extractOut == True:
-                print(f'Point {i:03d} is outside the domain! data from nearest node was exported.')
+                rep.append(f'Point {i:03d} is outside the domain! data from nearest node was exported.')
                 ## find nearest node to the requested point
                 mdist2 = cdist(list(zip(x[v[a[0]]], y[v[a[0]]])), np.reshape(pnts[i], (1, 2)))
                 clnode = mdist2.argmin()
@@ -243,12 +246,12 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
                 lnewzti = newz.copy()
                 dfout[f'{variable}_pnt{i:03d}'] = lnewzti
             else:
-                print(f'Point {i:03d} is outside the domain! Returning nan.')
+                rep.append(f'Point {i:03d} is outside the domain! Returning nan.')
                 dfout[f'{variable}_pnt{i:03d}'] = np.nan
-        
+    
     dfout = dfout.replace(-99999.000000, np.nan)
     
-    return dfout
+    return dfout, rep
     
 def ascii_replace(filein, fileout, olds, news):
     ''' Writes a new ascii file replacing fields from a template file
