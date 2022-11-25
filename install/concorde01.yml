@@ -12,3 +12,6 @@ dependencies:
  - statsmodels
  - matplotlib
  - seaborn
+ - netCDF4
+ - geopandas
+ - cartopy
