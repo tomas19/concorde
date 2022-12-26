@@ -344,6 +344,8 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                     status = line[4:-1]
                 elif line.startswith('  ** ERROR: Elevation.gt.ErrorElev, ADCIRC stopping. **'):
                     status = 'ADCIRC blow-up'
+                elif line.startswith('forrtl: No space left on device'):
+                    status = 'No space left on device'
                 else:
                     pass
             if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
