@@ -323,6 +323,7 @@ def checkAdcircLog(run, mtype = 'padcirc'):
         logs.sort(key = lambda x: os.path.getmtime(x))
         last_log = logs[-1]
         with open(run/last_log, 'r') as fin:
+            erroraux = 0
             lines = fin.readlines()
             for line in lines:
                 if line.startswith('Started at'):
@@ -337,7 +338,9 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                               int(etime[0]), int(etime[1]), int(etime[2]))
                 elif line.startswith(' MPI terminated with Status = '):
                     statusline = line.split()
-                    status = statusline[-1]
+                    #status = statusline[-1]
+                    if erroraux == 0:
+                        status = statusline[-1]
                 elif line.startswith('User defined signal 2'):
                     status = 'Time limit reached'
                 elif line.startswith('=   EXIT CODE:'):
@@ -348,6 +351,9 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                     status = 'No space left on device'
                 elif line.startswith("INFO: openFileForRead: The file './fort.22' was not found."):
                     status = 'fort.22 not found'
+                elif 'ADCIRC terminating' in line:
+                    status = 'Run failed'
+                    erroraux = 1
                 else:
                     pass
             if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
