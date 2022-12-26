@@ -346,6 +346,8 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                     status = 'ADCIRC blow-up'
                 elif line.startswith('forrtl: No space left on device'):
                     status = 'No space left on device'
+                elif line.startswith("INFO: openFileForRead: The file './fort.22' was not found."):
+                    status = 'fort.22 not found'
                 else:
                     pass
             if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
