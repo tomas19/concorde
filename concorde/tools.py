@@ -342,6 +342,8 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                     status = 'Time limit reached'
                 elif line.startswith('=   EXIT CODE:'):
                     status = line[4:-1]
+                elif line.startswith('forrtl: No space left on device'):
+                    status = 'No space left on device'
                 else:
                     pass
             if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
