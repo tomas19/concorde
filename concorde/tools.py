@@ -345,12 +345,16 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                     status = 'Time limit reached'
                 elif line.startswith('=   EXIT CODE:'):
                     status = line[4:-1]
+                    erroraux = 1
                 elif line.startswith('  ** ERROR: Elevation.gt.ErrorElev, ADCIRC stopping. **'):
                     status = 'ADCIRC blow-up'
+                    erroraux = 1
                 elif line.startswith('forrtl: No space left on device'):
                     status = 'No space left on device'
+                    erroraux = 1
                 elif line.startswith("INFO: openFileForRead: The file './fort.22' was not found."):
                     status = 'fort.22 not found'
+                    erroraux = 1
                 elif 'ADCIRC terminating' in line:
                     status = 'Run failed'
                     erroraux = 1
