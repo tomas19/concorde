@@ -16,6 +16,7 @@ from pathlib import Path
 #import cv2
 from itertools import islice
 from sklearn.neighbors import KDTree
+import tarfile
 
 def animate_list_imgs(imgs, fps, anim_name):
     ''' Function to animate list of images.
@@ -313,55 +314,71 @@ def checkAdcircLog(run, mtype = 'padcirc'):
     '''
     run  = Path(run)
     months = list(calendar.month_abbr)[1:]
-    logs = [run/x for x in os.listdir(run) if x.startswith(f'{mtype}.') and '.csh' not in x]
-    if len(logs) == 0:
-        dt = 'empty'
-        status = 'not run'
+    ## check if there are log files, only if run is a folder
+    if os.path.isdir(run):
+        logs = [run/x for x in os.listdir(run) if x.startswith(f'{mtype}.') and '.csh' not in x]
+        if len(logs) == 0:
+            dt = 'empty'
+            status = 'not run'
                                                            
     ## sort by modification date
     else:
-        logs.sort(key = lambda x: os.path.getmtime(x))
-        last_log = logs[-1]
-        with open(run/last_log, 'r') as fin:
-            erroraux = 0
-            lines = fin.readlines()
-            for line in lines:
-                if line.startswith('Started at'):
-                    startline = line.split()
-                    stime = startline[-2].split(':')
-                    sdate = datetime.datetime(int(startline[-1]), int(months.index(startline[3])), int(startline[4]), 
-                              int(stime[0]), int(stime[1]), int(stime[2]))
-                elif line.startswith('Terminated at'):
-                    endline = line.split()
-                    etime = endline[-2].split(':')
-                    edate = datetime.datetime(int(endline[-1]), int(months.index(endline[3])), int(endline[4]), 
-                              int(etime[0]), int(etime[1]), int(etime[2]))
-                elif line.startswith(' MPI terminated with Status = '):
-                    statusline = line.split()
-                    #status = statusline[-1]
-                    if erroraux == 0:
-                        status = statusline[-1]
-                elif line.startswith('User defined signal 2'):
-                    status = 'Time limit reached'
-                elif line.startswith('=   EXIT CODE:'):
-                    status = line[4:-1]
-                    erroraux = 1
-                elif line.startswith('  ** ERROR: Elevation.gt.ErrorElev, ADCIRC stopping. **'):
-                    status = 'ADCIRC blow-up'
-                    erroraux = 1
-                elif line.startswith('forrtl: No space left on device'):
-                    status = 'No space left on device'
-                    erroraux = 1
-                elif line.startswith("INFO: openFileForRead: The file './fort.22' was not found."):
-                    status = 'fort.22 not found'
-                    erroraux = 1
-                elif 'ADCIRC terminating' in line:
-                    status = 'Run failed'
-                    erroraux = 1
-                else:
-                    pass
-            if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
-                status = 'Still running '
+        if os.path.isdir(run):
+            logs.sort(key = lambda x: os.path.getmtime(x))
+            last_log = logs[-1]
+            
+            with open(run/last_log, 'r') as fin:
+                erroraux = 0
+                lines = fin.readlines()
+        else:
+            with tarfile.open(run, 'r') as tar:
+#            tar = tarfile.open(run)
+                logs = [x for x in tar.getmembers() if os.path.basename(x.name).startswith(f'{mtype}.') and 
+                        '.csh' not in os.path.basename(x.name) and 
+                        '.sh' not in os.path.basename(x.name)]
+                logs.sort(key = lambda x: x.mtime)
+                last_log = logs[-1]
+                lines = tar.extractfile(last_log).read()
+                lines = lines.decode('utf-8').split('\n')
+        
+        for line in lines:
+            if line.startswith('Started at'):
+                startline = line.split()
+                print(startline)
+                stime = startline[-2].split(':')
+                sdate = datetime.datetime(int(startline[-1]), 1 + int(months.index(startline[3])), int(startline[4]), 
+                          int(stime[0]), int(stime[1]), int(stime[2]))
+            elif line.startswith('Terminated at'):
+                endline = line.split()
+                etime = endline[-2].split(':')
+                edate = datetime.datetime(int(endline[-1]), 1 + int(months.index(endline[3])), int(endline[4]), 
+                          int(etime[0]), int(etime[1]), int(etime[2]))
+            elif line.startswith(' MPI terminated with Status = '):
+                statusline = line.split()
+                #status = statusline[-1]
+                if erroraux == 0:
+                    status = statusline[-1]
+            elif line.startswith('User defined signal 2'):
+                status = 'Time limit reached'
+            elif line.startswith('=   EXIT CODE:'):
+                status = line[4:-1]
+                erroraux = 1
+            elif line.startswith('  ** ERROR: Elevation.gt.ErrorElev, ADCIRC stopping. **'):
+                status = 'ADCIRC blow-up'
+                erroraux = 1
+            elif line.startswith('forrtl: No space left on device'):
+                status = 'No space left on device'
+                erroraux = 1
+            elif line.startswith("INFO: openFileForRead: The file './fort.22' was not found."):
+                status = 'fort.22 not found'
+                erroraux = 1
+            elif 'ADCIRC terminating' in line:
+                status = 'Run failed'
+                erroraux = 1
+            else:
+                pass
+        if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
+            status = 'Still running '
         try:
             dt = (edate - sdate).total_seconds()/3600
         except:
