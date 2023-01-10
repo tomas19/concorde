@@ -332,7 +332,6 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                 lines = fin.readlines()
         else:
             with tarfile.open(run, 'r') as tar:
-#            tar = tarfile.open(run)
                 logs = [x for x in tar.getmembers() if os.path.basename(x.name).startswith(f'{mtype}.') and 
                         '.csh' not in os.path.basename(x.name) and 
                         '.sh' not in os.path.basename(x.name)]
@@ -340,11 +339,11 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                 last_log = logs[-1]
                 lines = tar.extractfile(last_log).read()
                 lines = lines.decode('utf-8').split('\n')
+                erroraux = 0
         
         for line in lines:
             if line.startswith('Started at'):
                 startline = line.split()
-                print(startline)
                 stime = startline[-2].split(':')
                 sdate = datetime.datetime(int(startline[-1]), 1 + int(months.index(startline[3])), int(startline[4]), 
                           int(stime[0]), int(stime[1]), int(stime[2]))
