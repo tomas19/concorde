@@ -320,13 +320,14 @@ def checkAdcircLog(run, mtype = 'padcirc'):
         if len(logs) == 0:
             dt = 'empty'
             status = 'not run'
+            log_out = 'no log'
                                                            
     ## sort by modification date
     else:
         if os.path.isdir(run):
             logs.sort(key = lambda x: os.path.getmtime(x))
             last_log = logs[-1]
-            
+            log_out = last_log
             with open(run/last_log, 'r') as fin:
                 erroraux = 0
                 lines = fin.readlines()
@@ -340,6 +341,7 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                 lines = tar.extractfile(last_log).read()
                 lines = lines.decode('utf-8').split('\n')
                 erroraux = 0
+                log_out = last_log.name
         
         for line in lines:
             if line.startswith('Started at'):
@@ -387,7 +389,7 @@ def checkAdcircLog(run, mtype = 'padcirc'):
         except NameError:
             status = 'Error no catched, check log manually' 
     
-    return dt, status
+    return dt, status, log_out
 
 def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
     ''' Function to interpolate the fort.13 from one mesh to another using
