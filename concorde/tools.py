@@ -311,85 +311,105 @@ def checkAdcircLog(run, mtype = 'padcirc'):
             status: boolean
                 0 if finished correctly, 1 if crashed, 2 if time limit
                 reached and 'Still running'
+            log_out: string
+                name of the log file check, usefull in the case there are multiple files
     '''
-    run  = Path(run)
-    months = list(calendar.month_abbr)[1:]
-    ## check if there are log files, only if run is a folder
-    if os.path.isdir(run):
-        logs = [run/x for x in os.listdir(run) if x.startswith(f'{mtype}.') and '.csh' not in x]
-        if len(logs) == 0:
-            dt = 'empty'
-            status = 'not run'
-            log_out = 'no log'
-                                                           
-    ## sort by modification date
-    else:
-        if os.path.isdir(run):
-            logs.sort(key = lambda x: os.path.getmtime(x))
-            last_log = logs[-1]
-            log_out = last_log
-            with open(run/last_log, 'r') as fin:
-                erroraux = 0
-                lines = fin.readlines()
-        else:
-            with tarfile.open(run, 'r') as tar:
-                logs = [x for x in tar.getmembers() if os.path.basename(x.name).startswith(f'{mtype}.') and 
-                        '.csh' not in os.path.basename(x.name) and 
-                        '.sh' not in os.path.basename(x.name)]
-                logs.sort(key = lambda x: x.mtime)
-                last_log = logs[-1]
-                lines = tar.extractfile(last_log).read()
-                lines = lines.decode('utf-8').split('\n')
-                erroraux = 0
-                log_out = last_log.name
-        
+    def getStartDate(lines):
         for line in lines:
             if line.startswith('Started at'):
                 startline = line.split()
                 stime = startline[-2].split(':')
-                sdate = datetime.datetime(int(startline[-1]), 1 + int(months.index(startline[3])), int(startline[4]), 
-                          int(stime[0]), int(stime[1]), int(stime[2]))
-            elif line.startswith('Terminated at'):
-                endline = line.split()
-                etime = endline[-2].split(':')
-                edate = datetime.datetime(int(endline[-1]), 1 + int(months.index(endline[3])), int(endline[4]), 
-                          int(etime[0]), int(etime[1]), int(etime[2]))
-            elif line.startswith(' MPI terminated with Status = '):
-                statusline = line.split()
-                #status = statusline[-1]
-                if erroraux == 0:
-                    status = statusline[-1]
-            elif line.startswith('User defined signal 2'):
-                status = 'Time limit reached'
-            elif line.startswith('=   EXIT CODE:'):
-                status = line[4:-1]
-                erroraux = 1
-            elif line.startswith('  ** ERROR: Elevation.gt.ErrorElev, ADCIRC stopping. **'):
-                status = 'ADCIRC blow-up'
-                erroraux = 1
-            elif line.startswith('forrtl: No space left on device'):
-                status = 'No space left on device'
-                erroraux = 1
-            elif line.startswith("INFO: openFileForRead: The file './fort.22' was not found."):
-                status = 'fort.22 not found'
-                erroraux = 1
-            elif 'ADCIRC terminating' in line:
-                status = 'Run failed'
-                erroraux = 1
-            else:
-                pass
+                sdate = datetime.datetime(int(startline[-1]), 1 + int(months.index(startline[3])), 
+                            int(startline[4]), int(stime[0]), int(stime[1]), int(stime[2]))
+        return sdate
+    
+    run  = Path(run)
+    months = list(calendar.month_abbr)[1:]
+    ## check if there are log files, only if run is a folder
+    if os.path.isdir(run):
+        logs = [run/x for x in os.listdir(run) if x.startswith(f'{mtype}.') and 
+                '.csh' not in x and '.sh' not in x]
+        if len(logs) == 0:
+            dt = 'empty'
+            status = 'not run'
+            log_out = 'no log'
+        else:
+            sdates = []
+            for log in logs:
+                with open(log, 'r') as dummy:
+                    lines = dummy.readlines()
+                sd = getStartDate(lines)
+                sdates.append(sd)
+            last_sdate = sorted(sdates)[-1]
+            last_sdate_index = sdates.index(last_sdate)
+            last_log = logs[last_sdate_index]
+                
+            with open(last_log, 'r') as fin:
+                erroraux = 0
+                lines = fin.readlines()
+                last_sdate = getStartDate(lines)
+                log_out = last_log
+    else:
+        with tarfile.open(run, 'r') as tar:
+            logs = [x for x in tar.getmembers() if os.path.basename(x.name).startswith(f'{mtype}.') and 
+                    '.csh' not in os.path.basename(x.name) and 
+                    '.sh' not in os.path.basename(x.name)]
+            sdates = []
+            for log in logs:
+                lines = tar.extractfile(log).read()
+                lines = lines.decode('utf-8').split('\n')
+                sd = getStartDate(lines)
+                sdates.append(sd)
+
+            last_sdate = sorted(sdates)[-1]
+            last_sdate_index = sdates.index(last_sdate)
+            last_log = logs[last_sdate_index]            
+            lines = tar.extractfile(last_log).read()
+            lines = lines.decode('utf-8').split('\n')
+            erroraux = 0
+            log_out = last_log.name
+    
+    for line in lines:
+        if line.startswith('Terminated at'):
+            endline = line.split()
+            etime = endline[-2].split(':')
+            edate = datetime.datetime(int(endline[-1]), 1 + int(months.index(endline[3])), int(endline[4]), 
+                      int(etime[0]), int(etime[1]), int(etime[2]))
+        elif line.startswith(' MPI terminated with Status = '):
+            statusline = line.split()
+            if erroraux == 0:
+                status = statusline[-1]
+        elif line.startswith('User defined signal 2'):
+            status = 'Time limit reached'
+        elif line.startswith('=   EXIT CODE:'):
+            status = line[4:-1]
+            erroraux = 1
+        elif line.startswith('  ** ERROR: Elevation.gt.ErrorElev, ADCIRC stopping. **'):
+            status = 'ADCIRC blow-up'
+            erroraux = 1
+        elif line.startswith('forrtl: No space left on device'):
+            status = 'No space left on device'
+            erroraux = 1
+        elif line.startswith("INFO: openFileForRead: The file './fort.22' was not found."):
+            status = 'fort.22 not found'
+            erroraux = 1
+        elif 'ADCIRC terminating' in line:
+            status = 'Run failed'
+            erroraux = 1
+        else:
+            pass
         if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
             status = 'Still running '
         try:
-            dt = (edate - sdate).total_seconds()/3600
-        except:
+            dt = (edate - last_sdate).total_seconds()/3600
+        except NameError:
             dt = 0
         try:
             status
         except NameError:
             status = 'Error no catched, check log manually' 
     
-    return dt, status, log_out
+    return dt, status, os.path.basename(log_out)
 
 def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
     ''' Function to interpolate the fort.13 from one mesh to another using
