@@ -299,7 +299,8 @@ def ascii_replace(filein, fileout, olds, news):
 
 def checkAdcircLog(run, mtype = 'padcirc'):
     ''' Read padcirc.XXXXX file to find the run time and the MPI status. 
-        The last edited file will be analyzed.
+        The last edited file will be analyzed. TODO: add error if the only log file
+        doesn't have date info
         Parameters
             run: str
                 complete path of the adcirc run
@@ -321,7 +322,10 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                 stime = startline[-2].split(':')
                 sdate = datetime.datetime(int(startline[-1]), 1 + int(months.index(startline[3])), 
                             int(startline[4]), int(stime[0]), int(stime[1]), int(stime[2]))
-        return sdate
+        try:
+            return sdate
+        except NameError:
+            return datetime.datetime(1900, 1, 1, 0, 0)
     
     run  = Path(run)
     months = list(calendar.month_abbr)[1:]
@@ -331,7 +335,7 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                 '.csh' not in x and '.sh' not in x]
         if len(logs) == 0:
             dt = 'empty'
-            status = 'not run'
+            status = 'not ran'
             log_out = 'no log'
         else:
             sdates = []
