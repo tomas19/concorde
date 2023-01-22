@@ -1,4 +1,4 @@
-name: concorde01
+name: concorde
 channels:
  - conda-forge
 dependencies:
@@ -12,3 +12,7 @@ dependencies:
  - statsmodels
  - matplotlib
  - seaborn
+ - notebook
+ - netCDF4
+ - cartopy
+ - geopandas
