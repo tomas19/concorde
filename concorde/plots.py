@@ -3,7 +3,7 @@ import pandas as pd
 from scipy import interpolate
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import contextily as cxt
+#import contextily as cxt
 import datetime
 from sklearn.neighbors import KDTree
 
@@ -139,8 +139,9 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
         ax.set_xlim(xlims)
     if ylims is not None:
         ax.set_ylim(ylims)
-    if background_map == True:
-        cxt.add_basemap(ax, crs = 'EPSG:4326', source=cxt.providers.Stamen.Terrain)
+    ## replace with cartopy
+#    if background_map == True:
+#        cxt.add_basemap(ax, crs = 'EPSG:4326', source=cxt.providers.Stamen.Terrain)
     ax.set_xlabel('Longitude [deg]')
     ax.set_ylabel('Latitude [deg]')
     if cbar == True:

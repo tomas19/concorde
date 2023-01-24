@@ -16,3 +16,5 @@ dependencies:
  - netCDF4
  - cartopy
  - geopandas
+ - cmocean
+ - simplekml
