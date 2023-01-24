@@ -155,7 +155,7 @@ def curvature(x, y):
     
     return curvature_val
     
-def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
+def tsFromNC(ncObj, pnts, n=3, variable='zeta', extractOut=False, closestIfDry=False):
     ''' Interpolate adcirc results from the 3 nodes that forms the triangle in which 
         a point lies in for all timesteps
         Parameters
@@ -208,11 +208,17 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
     else:
         ## reshape to add an extra dimension
         z = ncObj[variable][:].data.reshape((1, ncObj[variable].size))
+
+    z[z < -9999] = np.nan
     ## loop through points
     rep = []
-    for i in tqdm(range(len(pnts))):
-        ## get the n centroid nearest to the point i
+    # for i in tqdm(range(len(pnts))):
+    for i in range(len(pnts)):
+        # print(pnts[i])
+        ## get the nearest n centroid to point i
+        # print(mdist.shape)
         a = np.where(mdist[:, i] < sorted(mdist[:, i])[n])[0]
+        #print(a)
         ## iterate through each element to see is the point is inside
         for ni in range(n):
             lnewzti = []
@@ -224,15 +230,34 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
                 break
         ## point is inside the mesh
         if 'vs' in locals():
-            rep.append(f'Point {i:03d} is inside the domain! data was interpolated.')
             xs = ncObj['x'][vs].data
             ys = ncObj['y'][vs].data 
             ## variable to interpolate
             zs = z[:, vs]
-            for zi in zs:
-                f = interpolate.LinearNDInterpolator(list(zip(xs, ys)), zi)
-                newz = float(f(pnts[i][0], pnts[i][1]))
-                lnewzti.append(newz)
+            ## check what happens with time series
+            zs_nonnans = [i for i, zsi in enumerate(zs[0]) if not np.isnan(zsi)]
+            if len(zs_nonnans) == 0 and closestIfDry == True:
+                ## all nans, get closest wet node
+                rep.append(f'Point {i:03d} is inside the domain! data extracted from closest wet node of all elements')
+                mdist2 = cdist(list(zip(x, y)), np.reshape(pnts[i], (1, 2)))
+                dfall = pd.DataFrame({'dist': mdist2.reshape(-1), f'{variable}': z.reshape(-1)})
+                dfall = dfall.dropna()
+                dfall = dfall.sort_values(['dist'])
+                newz = dfall.iloc[0, 1]
+            elif 3 > len(zs_nonnans) > 0 and closestIfDry == True:
+                ## get closest node of same element that is not wet
+                rep.append(f'Point {i:03d} is inside the domain! data extracted from closest wet node of the same element')
+                mdist2 = cdist(list(zip(x[v[a[0]]], y[v[a[0]]])), np.reshape(pnts[i], (1, 2)))
+                clnode = mdist2[zs_nonnans].argmin()
+                newz = zs[0][clnode]
+            else:
+                ## all nodes are wet
+                for zi in zs:
+                    f = interpolate.LinearNDInterpolator(list(zip(xs, ys)), zi)
+                    newz = float(f(pnts[i][0], pnts[i][1]))
+                    rep.append(f'Point {i:03d} is inside the domain! data was interpolated.')
+
+            lnewzti.append(newz)
             dfout[f'{variable}_pnt{i:03d}'] = lnewzti
             del vs
             
@@ -250,7 +275,7 @@ def tsFromNC(ncObj, pnts, n = 3, variable = 'zeta', extractOut = False):
                 rep.append(f'Point {i:03d} is outside the domain! Returning nan.')
                 dfout[f'{variable}_pnt{i:03d}'] = np.nan
     
-    dfout = dfout.replace(-99999.000000, np.nan)
+    # dfout = dfout.replace(-99999.000000, np.nan)
     
     return dfout, rep
     
