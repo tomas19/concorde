@@ -3,9 +3,10 @@ import pandas as pd
 from scipy import interpolate
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-#import contextily as cxt
 import datetime
 from sklearn.neighbors import KDTree
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 def scatter_interpolate(x,y,res=17,method='cubic',normalise=True, return_res = False):
     '''Interpolates scatter data on a 2D histogram based on density. This is a proxy of the KDE estimator, with lower (still acceptable) resolution but much faster.
@@ -70,11 +71,11 @@ def scatter_interpolate(x,y,res=17,method='cubic',normalise=True, return_res = F
 
 def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None, 
            vecsc = None, veccolor = 'k', xlims = None, ylims = None, 
-           cbar = False, gdf = None, ts = None, ax = None, fig = None, 
+           cbar = False, ts = None, ax = None, fig = None, 
            cmap = 'viridis', fsize = (8, 6), cb_shrink = 1, cb_label = None, 
            latpath = None, lonpath = None, background_map = False):
     ''' Funtion to create 2D plots from netcdf files. WIP
-        Parameters:
+        Parameters
             nc: netcdf object
                 adcirc file already loaded to memory to plot as contours
             var: string
@@ -112,7 +113,9 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
             lonpath: list
                 longitude values for storm path
             background_map: boolean
-                True for using contextily to plot a background map, doesn't work on the HPC
+                True for using cartopy to plot a background map, doesn't work on the HPC
+        Returns
+            ax: matplotlib axes subplots
     '''
     
     tri = mpl.tri.Triangulation(nc['x'][:].data, nc['y'][:].data, nc['element'][:,:] - 1)
@@ -121,9 +124,12 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
     else:
         aux = nc[var][ts, :].data
     aux = np.nan_to_num(aux, nan = -99999.0).reshape(-1)
-    if ax == None:
+    if ax == None and background_map == False:
         fig, ax = plt.subplots(figsize = fsize)
-    
+    elif ax == None and background_map == True:
+        fig, ax = plt.subplots(figsize = fsize, subplot_kw={'projection': ccrs.PlateCarree()}, 
+                            constrained_layout=True)
+
     contours = ax.tricontourf(tri, aux, levels = levels, cmap = cmap)
     
     if ncvec is not None:
@@ -139,16 +145,22 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
         ax.set_xlim(xlims)
     if ylims is not None:
         ax.set_ylim(ylims)
-    ## replace with cartopy
-#    if background_map == True:
-#        cxt.add_basemap(ax, crs = 'EPSG:4326', source=cxt.providers.Stamen.Terrain)
+
     ax.set_xlabel('Longitude [deg]')
     ax.set_ylabel('Latitude [deg]')
     if cbar == True:
-        cb = fig.colorbar(contours, shrink = cb_shrink, extend = 'both')
+        cb = fig.colorbar(contours, shrink = cb_shrink, extend = 'max')
         cb.set_label(cb_label)
-    if gdf is not None:
-        gdf.plot(ax = ax, color = 'r')
+    
+    if background_map == True:
+        # show coordinates and grid
+        gl = ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False, alpha=0.5, linestyle='--') 
+        gl.top_labels = False
+        gl.right_labels = False
+        ax.add_feature(cfeature.LAND)
+        ax.add_feature(cfeature.COASTLINE,lw=0.25)
+        ax.add_feature(cfeature.LAKES)
+
     
     if ts is not None:
         #Create date string
