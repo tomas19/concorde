@@ -249,9 +249,9 @@ def tsFromNC(ncObj, pnts, n=3, variable='zeta', extractOut=False, closestIfDry=F
                 rep.append(f'Point {i:03d} is inside the domain! data extracted from closest wet node of the same element')
                 mdist2 = cdist(list(zip(x[v[a[0]]], y[v[a[0]]])), np.reshape(pnts[i], (1, 2)))
                 clnode = mdist2[zs_nonnans].argmin()
-                newz = zs[0][clnode]
+                newz = zs[0][zs_nonnans[clnode]]
             else:
-                ## all nodes are wet
+                ## all nodes are wet or, if one node of the element is dry output will be nan
                 for zi in zs:
                     f = interpolate.LinearNDInterpolator(list(zip(xs, ys)), zi)
                     newz = float(f(pnts[i][0], pnts[i][1]))
