@@ -244,20 +244,24 @@ def tsFromNC(ncObj, pnts, n=3, variable='zeta', extractOut=False, closestIfDry=F
                 dfall = dfall.dropna()
                 dfall = dfall.sort_values(['dist'])
                 newz = dfall.iloc[0, 1]
+                lnewzti.append(newz)
+                
             elif 3 > len(zs_nonnans) > 0 and closestIfDry == True:
                 ## get closest node of same element that is not wet
                 rep.append(f'Point {i:03d} is inside the domain! data extracted from closest wet node of the same element')
                 mdist2 = cdist(list(zip(x[v[a[0]]], y[v[a[0]]])), np.reshape(pnts[i], (1, 2)))
                 clnode = mdist2[zs_nonnans].argmin()
                 newz = zs[0][zs_nonnans[clnode]]
+                lnewzti.append(newz)
+                
             else:
                 ## all nodes are wet or, if one node of the element is dry output will be nan
                 for zi in zs:
                     f = interpolate.LinearNDInterpolator(list(zip(xs, ys)), zi)
                     newz = float(f(pnts[i][0], pnts[i][1]))
                     rep.append(f'Point {i:03d} is inside the domain! data was interpolated.')
-
-            lnewzti.append(newz)
+                    lnewzti.append(newz)
+                    
             dfout[f'{variable}_pnt{i:03d}'] = lnewzti
             del vs
             
