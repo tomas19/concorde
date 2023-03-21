@@ -578,3 +578,63 @@ def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
                     ## write attr with only default values
                     fout.write(key + '\n')
                     fout.write('0')
+
+def from_mag_to_uv(vel, direction,meteo=True):
+    ''' Function to transform velocity direction and magnitude into directional (vectorial) velocities U,V. 
+
+    Parameters:
+        vel: value, series or array 
+            Velocity magnitude (can be wind, waves, currents, etc)
+        dir:  value, series or array 
+            Velocity direction (can be wind, waves, currents, etc)
+        meteo: boolean (optional)
+            Value to indicate if meteorological convention (True) or non-meteorological convention (False) is wanted for directional (vectorial) output. 
+                (Default) Meteorological convention is the direction where the wind is blowing from, or where waves come from. 
+                Non-meteorological convention is the direction where the currents are going to.
+
+    Returns:
+        u,v: tuple
+            Tuple with values (can be an array or pandas series) of  velocities in x and y axis (u,v). This is given in the form (u1,u2,u3...uN),(v1,v2,v3...vN)
+        
+    '''
+    # direction=np.asarray(direction) #Change values to arrays
+    # vel=np.asarray(vel) #Change values to arrays
+    
+    if meteo==False:
+        direction=direction+180
+    else:
+        pass    
+    
+    if len(vel)==1:
+        u = -1*np.abs(vel)*np.sin(np.pi*np.mod(direction, 360)/180)
+        v = -1*np.abs(vel)*np.cos(np.pi*np.mod(direction, 360)/180)
+    else:
+        u = -1*np.abs(list(vel))*np.sin(np.pi*np.mod(list(direction), 360)/180)
+        v = -1*np.abs(list(vel))*np.cos(np.pi*np.mod(list(direction), 360)/180)
+    return u,v
+       
+def from_uv_to_mag(u,v,meteo=True):
+    ''' Function to transform directional velocities U,V into velocity direction and magnitude. 
+
+    Parameters:
+        u: float, int, list, series or array 
+             value or values of X velocities
+        v: float, in, series or array 
+             value or values of X velocities
+        meteo: boolean (optional)
+            Value to indicate if meteorological convention (True) or non-meteorological convention (False) is wanted for directional output. 
+                (Default) Meteorological convention is the direction where the wind is blowing from, or where waves come from. 
+                Non-meteorological convention is the direction where the currents are going to.
+
+    Returns:
+        vel,d: tuple
+            Tuple with values (can be an int, float, array o pandas series) of  velocities (magnitudes) and directions
+        
+    '''
+    vel = (u**2+v**2)**0.5
+    d = np.arctan2(u/vel, v/vel)*180/np.pi 
+    if meteo==True:
+        d = np.mod(d+180, 360)
+    else:
+        d = np.mod(d,360)
+    return vel, d
