@@ -149,7 +149,7 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
     ax.set_xlabel('Longitude [deg]')
     ax.set_ylabel('Latitude [deg]')
     if cbar == True:
-        cb = fig.colorbar(contours, shrink = cb_shrink, extend = 'max')
+        cb = fig.colorbar(contours, shrink = cb_shrink, extend = 'max', ax = ax)
         cb.set_label(cb_label)
     
     if background_map == True:
