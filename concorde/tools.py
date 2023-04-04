@@ -234,52 +234,65 @@ def tsFromNC(ncObj, pnts, n=5, variable='zeta', extractOut=False, closestIfDry=F
             ys = ncObj['y'][vs].data 
             ## variable to interpolate
             zs = z[:, vs]
-            ## check what happens with time series
-            zs_nonnans = [i for i, zsi in enumerate(zs[0]) if not np.isnan(zsi)]
-            if len(zs_nonnans) == 0 and closestIfDry == True:
-                ## all nans, get closest wet node
-                rep.append(f'Point {i:03d} is inside the domain! data extracted from closest wet node of all elements')
+
+            ## 3 nodes are dry for the entire simulation, extract values from the closest node with any wet time step
+            if np.isnan(zs).all() and closestIfDry == True:
                 mdist2 = cdist(list(zip(x, y)), np.reshape(pnts[i], (1, 2)))
-                dfall = pd.DataFrame({'dist': mdist2.reshape(-1), f'{variable}': z.reshape(-1)})
-                dfall = dfall.dropna()
-                dfall = dfall.sort_values(['dist'])
-                newz = dfall.iloc[0, 1]
-                lnewzti.append(newz)
+                mdist2 = np.concatenate((mdist2, np.arange(len(mdist2)).reshape((-1, 1))), axis = 1)
+                mdist2_sorted = np.take(mdist2, np.argsort(mdist2[:, 0]), axis = 0)
+
+                for k in mdist2_sorted[:, 1]:
+                    zsk = z[:, int(k)]
+                    if np.isnan(zsk).all() == False:
+                        newz = zsk
+                        rep.append(f"Point {i:03d} is inside the domain! All element's nodes are dry, so data from the closest wet node ({int(k)}) was extracted.")
+                        break
+                try:
+                    lnewzti.extend(newz)
+                except:
+                    lnewzti.append(newz)
+
+            elif np.isnan(zs).any() and closestIfDry == True:
+                ## get values from the closest node with wet time steps from the same element
                 
-            elif 3 > len(zs_nonnans) > 0 and closestIfDry == True:
-                ## get closest node of same element that is not wet
-                rep.append(f'Point {i:03d} is inside the domain! data extracted from closest wet node of the same element')
-                mdist2 = cdist(list(zip(x[v[a[0]]], y[v[a[0]]])), np.reshape(pnts[i], (1, 2)))
-                clnode = mdist2[zs_nonnans].argmin()
-                newz = zs[0][zs_nonnans[clnode]]
-                lnewzti.append(newz)
-                
+                mdist2 = cdist(list(zip(x[v[a[ni]]], y[v[a[ni]]])), np.reshape(pnts[i], (1, 2)))
+                mdist2 = np.concatenate((mdist2, np.arange(len(mdist2)).reshape((-1, 1))), axis = 1)
+                mdist2_sorted = np.take(mdist2, np.argsort(mdist2[:, 0]), axis = 0)
+
+                for k in mdist2_sorted[:, 1]:
+                    zsk = zs[:, int(k)]
+                    if np.isnan(zsk).all() == False:
+                        newz = zsk
+                        rep.append(f"Point {i:03d} is inside the domain! There are dry nodes in the element, so data from the closest wet node ({v[a[int(k)]]}) in the element was extracted.")
+                        break
+                try:
+                    lnewzti.extend(newz)
+                except:
+                    lnewzti.append(newz)
             else:
+                rep.append(f"Point {i:03d} is inside the domain! data was interpolated using the corresponding element's nodes.")
                 ## all nodes are wet or, if one node of the element is dry output will be nan
                 for zi in zs:
                     f = interpolate.LinearNDInterpolator(list(zip(xs, ys)), zi)
                     newz = float(f(pnts[i][0], pnts[i][1]))
-                    rep.append(f'Point {i:03d} is inside the domain! data was interpolated.')
                     lnewzti.append(newz)
                     
             dfout[f'{variable}_pnt{i:03d}'] = lnewzti
             del vs
-            
+                
         else:
             ## point is outside the domain
             if extractOut == True:
-                rep.append(f'Point {i:03d} is outside the domain! data from nearest node was exported.')
                 ## find nearest node to the requested point
                 mdist2 = cdist(list(zip(x[v[a[0]]], y[v[a[0]]])), np.reshape(pnts[i], (1, 2)))
                 clnode = mdist2.argmin()
+                rep.append(f'Point {i:03d} is outside the domain! data from  node {clnode} (closest) was exported.')
                 newz = z[:, v[a[0]][clnode]]
                 lnewzti = newz.copy()
                 dfout[f'{variable}_pnt{i:03d}'] = lnewzti
             else:
                 rep.append(f'Point {i:03d} is outside the domain! Returning nan.')
                 dfout[f'{variable}_pnt{i:03d}'] = np.nan
-    
-    # dfout = dfout.replace(-99999.000000, np.nan)
     
     return dfout, rep
     
