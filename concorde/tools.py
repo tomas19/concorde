@@ -357,8 +357,8 @@ def checkAdcircLog(run, mtype = 'padcirc'):
             log_out: string
                 name of the log file check, usefull in the case there are multiple files
     '''
-    def getStartDate(lines):
-        for line in lines:
+    def getStartDate(lines2):
+        for line in lines2:
             if line.startswith('Started at'):
                 startline = line.split()
                 stime = startline[-2].split(':')
@@ -415,47 +415,50 @@ def checkAdcircLog(run, mtype = 'padcirc'):
             erroraux = 0
             log_out = last_log.name
     
-    for line in lines:
-        if line.startswith('Terminated at'):
-            endline = line.split()
-            etime = endline[-2].split(':')
-            edate = datetime.datetime(int(endline[-1]), 1 + int(months.index(endline[3])), int(endline[4]), 
-                      int(etime[0]), int(etime[1]), int(etime[2]))
-        elif line.startswith(' MPI terminated with Status = '):
-            statusline = line.split()
-            if erroraux == 0:
-                status = statusline[-1]
-        elif line.startswith('User defined signal 2'):
-            status = 'Time limit reached'
-        elif line.startswith('=   EXIT CODE:'):
-            status = line[4:-1]
-            erroraux = 1
-        elif line.startswith('  ** ERROR: Elevation.gt.ErrorElev, ADCIRC stopping. **'):
-            status = 'ADCIRC blow-up'
-            erroraux = 1
-        elif line.startswith('forrtl: No space left on device'):
-            status = 'No space left on device'
-            erroraux = 1
-        elif line.startswith("INFO: openFileForRead: The file './fort.22' was not found."):
-            status = 'fort.22 not found'
-            erroraux = 1
-        elif 'ADCIRC terminating' in line:
-            status = 'Run failed'
-            erroraux = 1
-        else:
-            pass
-        if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
-            status = 'Still running '
-        try:
-            dt = (edate - last_sdate).total_seconds()/3600
-        except NameError:
-            dt = 0
-        try:
-            status
-        except NameError:
-            status = 'Error no catched, check log manually' 
-    
-    return dt, status, os.path.basename(log_out)
+    if lines in locals():
+        for line in lines:
+            if line.startswith('Terminated at'):
+                endline = line.split()
+                etime = endline[-2].split(':')
+                edate = datetime.datetime(int(endline[-1]), 1 + int(months.index(endline[3])), int(endline[4]), 
+                          int(etime[0]), int(etime[1]), int(etime[2]))
+            elif line.startswith(' MPI terminated with Status = '):
+                statusline = line.split()
+                if erroraux == 0:
+                    status = statusline[-1]
+            elif line.startswith('User defined signal 2'):
+                status = 'Time limit reached'
+            elif line.startswith('=   EXIT CODE:'):
+                status = line[4:-1]
+                erroraux = 1
+            elif line.startswith('  ** ERROR: Elevation.gt.ErrorElev, ADCIRC stopping. **'):
+                status = 'ADCIRC blow-up'
+                erroraux = 1
+            elif line.startswith('forrtl: No space left on device'):
+                status = 'No space left on device'
+                erroraux = 1
+            elif line.startswith("INFO: openFileForRead: The file './fort.22' was not found."):
+                status = 'fort.22 not found'
+                erroraux = 1
+            elif 'ADCIRC terminating' in line:
+                status = 'Run failed'
+                erroraux = 1
+            else:
+                pass
+            if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
+                status = 'Still running '
+            try:
+                dt = (edate - last_sdate).total_seconds()/3600
+            except NameError:
+                dt = 0
+            try:
+                status
+            except NameError:
+                status = 'Error no catched, check log manually' 
+        
+        return dt, status, os.path.basename(log_out)
+    else:
+        dt, status, 'noLogFile'
 
 def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
     ''' Function to interpolate the fort.13 from one mesh to another using
