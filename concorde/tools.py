@@ -555,7 +555,7 @@ def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
                 nnondef = int(lines[int(inds[1] + 1)][:-1])
                 ## index where the nodes of the attr finish
                 indf = indi + nnondef - 1
-                ## read data only there are more than 0 non default vertices
+                ## read data only if there are more than 0 non default vertices
                 if nnondef > 0:
                     ## read the lines between previous defined indices as dataframes
                     olds = pd.read_csv(fort13_old, skiprows = indi + 3, nrows = indf - indi + 1, header = None, sep = ' ', index_col = 0)
@@ -597,7 +597,7 @@ def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
                 else:
                     ## write attr with only default values
                     fout.write(key + '\n')
-                    fout.write('0')
+                    fout.write('0\n')
 
 def from_mag_to_uv(vel, direction,meteo=True):
     ''' Function to transform velocity direction and magnitude into directional (vectorial) velocities U,V. 
