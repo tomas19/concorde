@@ -26,7 +26,7 @@ def animate_list_imgs(imgs, fps, anim_name):
             fps: int
                 frames per second
             anim_name: str
-                output name, only name without path. The video will be saved in the notebook path. For the moment, only avi extension has been tested
+                output name, only name without path. The video will be saved in the notebook path
         Returns
             None
     '''
@@ -34,7 +34,13 @@ def animate_list_imgs(imgs, fps, anim_name):
     h, w, l = im.shape
     size = (w, h)
     
-    out = cv2.VideoWriter(anim_name, cv2.VideoWriter_fourcc(*'DIVX'), 10, size)
+    if anim_name.endswith('.avi'):
+        out = cv2.VideoWriter(anim_name, cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
+    elif anim_name.endswith('.mp4'):
+        out = cv2.VideoWriter(anim_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
+    else:
+        print('Only avi and mp4 extensions are supported')
+        sys.exit(-1)
     
     for i in tqdm(imgs):
         im = cv2.imread(i)
