@@ -655,3 +655,21 @@ def from_uv_to_mag(u,v,meteo=True):
     else:
         d = np.mod(d,360)
     return vel, d
+    
+def ssScale(x):
+    ''' Saffir-Simpson scale in meters per second
+    '''
+    if x < 33:
+        cat = 0
+    elif 33 <= x < 43:
+        cat = 1
+    elif 43 <= x < 49:
+        cat = 2
+    elif 49 <= x < 58:
+        cat = 3
+    elif 58 <= x < 70:
+        cat = 4
+    else:
+        cat = 5
+
+    return cat
