@@ -388,13 +388,9 @@ def checkAdcircLog(run, mtype = 'padcirc'):
         else:
             sdates = []
             for log in logs:
-                with open(log, 'r') as dummy:
-                    lines = dummy.readlines()
-                sd = getStartDate(lines)
-                sdates.append(sd)
-            last_sdate = sorted(sdates)[-1]
-            last_sdate_index = sdates.index(last_sdate)
-            last_log = logs[last_sdate_index]
+                sdates.append(os.path.getmtime(log))
+            last_sdate = max(sdates)
+            last_log = logs[np.argmax(sdates)]
                 
             with open(last_log, 'r') as fin:
                 erroraux = 0
@@ -415,23 +411,22 @@ def checkAdcircLog(run, mtype = 'padcirc'):
 
             last_sdate = sorted(sdates)[-1]
             last_sdate_index = sdates.index(last_sdate)
-            last_log = logs[last_sdate_index]            
+            last_log = logs[last_sdate_index]
             lines = tar.extractfile(last_log).read()
             lines = lines.decode('utf-8').split('\n')
             erroraux = 0
             log_out = last_log.name
     
-    if lines in locals():
-        for line in lines:
+    if 'lines' in locals() and isinstance(lines, list):
+        startWarning = 0
+        for iline, line in enumerate(lines):
             if line.startswith('Terminated at'):
                 endline = line.split()
                 etime = endline[-2].split(':')
                 edate = datetime.datetime(int(endline[-1]), 1 + int(months.index(endline[3])), int(endline[4]), 
                           int(etime[0]), int(etime[1]), int(etime[2]))
-            elif line.startswith(' MPI terminated with Status = '):
-                statusline = line.split()
-                if erroraux == 0:
-                    status = statusline[-1]
+            elif '100.00% COMPLETE' in line:
+                status = 'complete'
             elif line.startswith('User defined signal 2'):
                 status = 'Time limit reached'
             elif line.startswith('=   EXIT CODE:'):
@@ -440,6 +435,11 @@ def checkAdcircLog(run, mtype = 'padcirc'):
             elif line.startswith('  ** ERROR: Elevation.gt.ErrorElev, ADCIRC stopping. **'):
                 status = 'ADCIRC blow-up'
                 erroraux = 1
+            elif '** WARNING: Elevation.gt.WarnElev **' in line and startWarning == 0:
+                nodeElevWarning = int(line.split()[5])
+                nodeSpeedWarning = int(line.split()[11])
+                perWarning = lines[iline - 3].split('COMPLETE')[0].split()[-1]
+                startWarning = 1
             elif line.startswith('forrtl: No space left on device'):
                 status = 'No space left on device'
                 erroraux = 1
@@ -451,20 +451,26 @@ def checkAdcircLog(run, mtype = 'padcirc'):
                 erroraux = 1
             else:
                 pass
-            if line.startswith(' TIME STEP') or line.startswith('  ELMAX'):
-                status = 'Still running '
-            try:
-                dt = (edate - last_sdate).total_seconds()/3600
-            except NameError:
-                dt = 0
-            try:
-                status
-            except NameError:
-                status = 'Error no catched, check log manually' 
+        if line[-1].startswith(' TIME STEP') or line.startswith('  ELMAX'):
+            status = 'Still running '
+        try:
+            dt = (edate - last_sdate).total_seconds()/3600
+        except NameError:
+            dt = 0
+        try:
+            nodeElevWarning
+        except NameError:
+            nodeElevWarning = None
+            nodeSpeedWarning = None
+            perWarning = None
+        try:
+            status
+        except NameError:
+            status = 'Error no catched, check log manually' 
         
-        return dt, status, os.path.basename(log_out)
+        return dt, status, os.path.basename(log_out), nodeElevWarning, nodeSpeedWarning, perWarning
     else:
-        dt, status, 'noLogFile'
+        return 'noLogFile', 'noLogFile', 'noLogFile', 'noLogFile', 'noLogFile', 'noLogFile'
 
 def NNfort13(fort14_old, fort14_new, fort13_old, fort13_new, attrs):
     ''' Function to interpolate the fort.13 from one mesh to another using
