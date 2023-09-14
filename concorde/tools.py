@@ -688,3 +688,14 @@ def ssScale(x):
         cat = 5
 
     return cat
+    
+def waveLength(T, h, g = 9.81):
+    
+    l0 = g/(2*np.pi)*T**2
+    while True:
+        l = g * T**2 / (2 * np.pi) * np.tanh(2 * np.pi / l0 * h)
+        if np.abs(l0 - l) < 1e-6:
+            break
+        else:
+            l0 = l
+    return l
