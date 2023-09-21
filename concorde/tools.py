@@ -688,3 +688,14 @@ def ssScale(x):
         cat = 5
 
     return cat
+
+def readFort22(pathIn):
+    f22 = pd.read_csv(pathIn, header = None)
+    f22.index = [datetime.datetime(int(str(x)[:4]), int(str(x)[4:6]), int(str(x)[6:8]), int(str(x)[8:10])) for x in f22.iloc[:, 2]]
+    f22['lon'] = [-1*int(x[:-1])/10 for x in f22.iloc[:, 7]]
+    f22['lat'] = [int(x[:-1])/10 for x in f22.iloc[:, 6]]
+    f22['wind_speed'] = [x/1.94384 for x in f22.iloc[:, 8]]
+    f22['pressure'] = [x for x in f22.iloc[:, 9]]
+    f22['rad_to_max_ws'] = [x for x in f22.iloc[:, 19]]
+    f22 = f22[['lon', 'lat', 'wind_speed', 'pressure', 'rad_to_max_ws']]
+    return f22
