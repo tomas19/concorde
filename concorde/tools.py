@@ -688,8 +688,44 @@ def ssScale(x):
         cat = 5
 
     return cat
+
+def readFort22(pathIn, nws=8):
+    ''' read fort.22 file as pandas dataframe
+        Parameters
+            pathIn: str
+                full path of the fort.22 file
+            nws: int
+                fort.22 format. Default 8
+         Returns
+             f22: pandas dataframe
+                 fort.22 as pandas dataframe
+    '''
+    f22 = pd.read_csv(pathIn, header = None)
+    if nws == 8:
+        f22.index = [datetime.datetime(int(str(x)[:4]), int(str(x)[4:6]), int(str(x)[6:8]), int(str(x)[8:10])) for x in f22.iloc[:, 2]]
+        f22['lon'] = [-1*int(x[:-1])/10 for x in f22.iloc[:, 7]]
+        f22['lat'] = [int(x[:-1])/10 for x in f22.iloc[:, 6]]
+        f22['wind_speed'] = [x/1.94384 for x in f22.iloc[:, 8]] ##m/s
+        f22['pressure'] = [x for x in f22.iloc[:, 9]]
+        f22['rad_to_max_ws'] = [x for x in f22.iloc[:, 19]]
+        f22 = f22[['lon', 'lat', 'wind_speed', 'pressure', 'rad_to_max_ws']]
+        return f22
+    else:
+        sys.exit('Only nws = 8 is supported')
     
 def waveLength(T, h, g = 9.81):
+    ''' Compute wave length
+        Parameters
+            T: float
+                wave period
+            h: float
+                water depth
+            g: float
+                gravity acceleration. Default 9.81
+        Default
+            L: float
+                wave length
+    '''
     
     l0 = g/(2*np.pi)*T**2
     while True:
