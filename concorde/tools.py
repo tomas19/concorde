@@ -695,7 +695,10 @@ def readFort22(pathIn, nws=8):
             pathIn: str
                 full path of the fort.22 file
             nws: int
-                fort.22 format. Default 8.
+                fort.22 format. Default 8
+         Returns
+             f22: pandas dataframe
+                 fort.22 as pandas dataframe
     '''
     f22 = pd.read_csv(pathIn, header = None)
     if nws == 8:
@@ -710,3 +713,25 @@ def readFort22(pathIn, nws=8):
     else:
         sys.exit('Only nws = 8 is supported')
     
+def waveLength(T, h, g = 9.81):
+    ''' Compute wave length
+        Parameters
+            T: float
+                wave period
+            h: float
+                water depth
+            g: float
+                gravity acceleration. Default 9.81
+        Default
+            L: float
+                wave length
+    '''
+    
+    l0 = g/(2*np.pi)*T**2
+    while True:
+        l = g * T**2 / (2 * np.pi) * np.tanh(2 * np.pi / l0 * h)
+        if np.abs(l0 - l) < 1e-6:
+            break
+        else:
+            l0 = l
+    return l
