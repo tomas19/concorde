@@ -764,3 +764,15 @@ def forwardSpeed(df):
 
 def geoDistKM(y, x, pnt):
     return geopy.distance.geodesic(pnt, (y, x)).km
+
+def radImpact(vmax, rmax, vr = 33, beta = 1):
+    r1 = rmax
+    while True:
+        r = rmax * (vr / vmax)**(-2 / beta) * (np.exp(1 - (rmax / r1)**beta))**(1 / beta)
+        if np.abs(r - r1) < 1e-5:
+            break
+        r1 = r
+    if r == 0:
+        return rmax
+    else:
+        return r
