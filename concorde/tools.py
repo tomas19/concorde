@@ -761,5 +761,5 @@ def forwardSpeed(df):
     
     return vellist
 
-def dist2NC(y, x, pnt):
+def geoDistKM(y, x, pnt):
     return geopy.distance.geodesic(pnt, (y, x)).km
