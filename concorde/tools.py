@@ -735,3 +735,31 @@ def waveLength(T, h, g = 9.81):
         else:
             l0 = l
     return l
+
+def stormDir(df):
+    ''' direction going to as currents
+    '''
+    x = (df.loc[:, 'lon'].shift(1) - df.loc[:, 'lon']).values
+    y = (df.loc[:, 'lat'].shift(1) - df.loc[:, 'lat']).values
+    d = np.arctan2(x, y)
+    d2 = np.rad2deg(d)
+    d2 = np.mod(d2, 360)
+
+    return d2
+
+def forwardSpeed(df):
+    ''' Compute storm forward speed
+    
+    '''
+    vellist = [np.nan] 
+    for i, j in zip(df.index[:-1], df.index[1:]):
+        p1 = (df.loc[i, 'lat'], df.loc[i, 'lon'])
+        p2 = (df.loc[j, 'lat'], df.loc[j, 'lon'])
+        dist = geopy.distance.geodesic(p2, p1).km
+        vel = dist/3 ##km/hr, time step is 3hr
+        vellist.append(vel)
+    
+    return vellist
+
+def dist2NC(y, x, pnt):
+    return geopy.distance.geodesic(pnt, (y, x)).km
