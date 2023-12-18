@@ -17,6 +17,7 @@ from pathlib import Path
 from itertools import islice
 from sklearn.neighbors import KDTree
 import tarfile
+import geopy.distance
 
 def animate_list_imgs(imgs, fps, anim_name):
     ''' Function to animate list of images.
