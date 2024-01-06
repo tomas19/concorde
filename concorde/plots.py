@@ -135,7 +135,7 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
     if ncvec is not None:
         ## plot vectors
         if dxvec is None and dyvec is None:
-            ax.quiver(ncvec['x'], ncvec['y'], ncvec['windx'][ts, :], ncws['windy'][ts, :], scale=vecsc)
+            ax.quiver(ncvec['x'], ncvec['y'], ncvec['windx'][ts, :], ncvec['windy'][ts, :], scale=vecsc)
         else:
             nodes_to_plot = res_nodes_for_plot_vectors(ncvec, dxvec, dyvec)
             ax.quiver(ncvec['x'][nodes_to_plot], ncvec['y'][nodes_to_plot], 
