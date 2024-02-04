@@ -73,7 +73,7 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
            vecsc = None, veccolor = 'k', xlims = None, ylims = None, 
            cbar = False, ts = None, ax = None, fig = None, 
            cmap = 'viridis', fsize = (8, 6), cb_shrink = 1, cb_label = None, 
-           latpath = None, lonpath = None, background_map = False):
+           latpath = None, lonpath = None, background_map = False, annotate_date = True):
     ''' Funtion to create 2D plots from netcdf files. WIP
         Parameters
             nc: netcdf object
@@ -171,12 +171,13 @@ def plot2D(nc, var, levels, ncvec = None, dxvec = None, dyvec = None,
 
         #Create timestep string
         timestep = 'Timestep ' + str(ts).zfill(3)
-        
-        #Add date and timestep as footer
-        ax.annotate(date, xy = (0, 0.98), xycoords='axes fraction',
-                    ha='left', va="center", fontsize=10)
-        ax.annotate(timestep, xy = (0, 0.95), xycoords='axes fraction',
-                    ha='left', va="center", fontsize=10)
+
+        if annotate_date == True:
+            #Add date and timestep as footer
+            ax.annotate(date, xy = (0, 0.98), xycoords='axes fraction',
+                        ha='left', va="center", fontsize=10)
+            ax.annotate(timestep, xy = (0, 0.95), xycoords='axes fraction',
+                        ha='left', va="center", fontsize=10)
 
     #Plot storm path from lonpath and latpath
     if latpath is not None:
